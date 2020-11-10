@@ -1,5 +1,6 @@
 use anyhow::Context;
 use std::collections::HashMap;
+use std::fmt::Write as _;
 
 #[derive(serde::Deserialize)]
 struct Resp<T> {
@@ -47,7 +48,7 @@ fn trim_word_boundaries(s: &str) -> &str {
         .trim()
 }
 
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 struct SortAction {
     column: Column,
     direction: Direction,
@@ -260,6 +261,131 @@ fn fetch_streams<'a>(
     Ok(streams)
 }
 
+fn sort_streams(streams: &mut Vec<Stream>, option: Option<SortAction>) {
+    use {Column::*, Direction::*};
+    streams.sort_unstable_by(|left, right| {
+        option
+            .map(|sort| {
+                let SortAction { column, direction } = sort;
+                let ordering = match column {
+                    Viewers => left.viewer_count.cmp(&right.viewer_count),
+                    Uptime => left.uptime.cmp(&right.uptime),
+                    // invert this so its a->z not z->a
+                    Name => right.user_name.cmp(&left.user_name),
+                    _ => unreachable!(),
+                };
+
+                match direction {
+                    Descending => ordering,
+                    Ascending => ordering.reverse(),
+                }
+            })
+            .unwrap_or_else(|| left.viewer_count.cmp(&right.viewer_count))
+    });
+}
+
+#[derive(Default)]
+struct Pad {
+    viewers: usize,
+    name: usize,
+    timestamp: usize,
+}
+
+fn calculate_column_padding<'a>(iter: impl Iterator<Item = &'a Stream> + 'a) -> Pad {
+    let mut pad = iter.fold(Pad::default(), |mut p, stream| {
+        p.viewers = p.viewers.max(stream.viewer_count as usize);
+        p.name = p.name.max(stream.user_name.len());
+        p.timestamp = p.timestamp.max(stream.started_at.len());
+        p
+    });
+    pad.viewers = count_digits(pad.viewers as u64);
+    pad.timestamp = "uptime".len().max(pad.timestamp);
+    pad
+}
+
+struct Header {
+    header: String,
+    line: String,
+}
+
+fn calculate_header(visible: &[Column], pad: &Pad) -> anyhow::Result<Header> {
+    let Pad {
+        viewers: viewers_max,
+        name: name_max,
+        timestamp: timestamp_max,
+    } = pad;
+
+    let mut header = String::new();
+    for column in visible {
+        if !header.is_empty() {
+            header.push_str(" | ");
+        }
+        match column {
+            Column::Viewers => write!(
+                &mut header,
+                "{viewers: >viewers_max$}",
+                viewers = " ",
+                viewers_max = viewers_max
+            )?,
+            Column::Uptime => write!(
+                &mut header,
+                "{uptime: ^timestamp_max$}",
+                uptime = "uptime",
+                timestamp_max = timestamp_max,
+            )?,
+            Column::Name => write!(
+                &mut header,
+                "{link: ^name_max$}",
+                link = "link",
+                name_max = name_max + "https://twitch.tv/".len()
+            )?,
+            Column::Title => write!(&mut header, "title")?,
+        }
+    }
+    let line = format!("{:->max$}", "", max = header.len());
+
+    Ok(Header { header, line })
+}
+
+fn calculate_actual_line(stream: &Stream, visible: &[Column], pad: &Pad) -> anyhow::Result<String> {
+    let Pad {
+        viewers: viewers_max,
+        name: name_max,
+        timestamp: timestamp_max,
+    } = pad;
+
+    let mut output = String::new();
+    for column in visible {
+        if !output.is_empty() {
+            output.push_str(" | ")
+        }
+
+        match column {
+            Column::Viewers => write!(
+                &mut output,
+                "{viewers: >viewers_max$}",
+                viewers = stream.viewer_count,
+                viewers_max = viewers_max,
+            )?,
+            Column::Uptime => write!(
+                &mut output,
+                "{started_at: >timestamp_max$}",
+                started_at = stream.started_at,
+                timestamp_max = timestamp_max,
+            )?,
+            Column::Name => write!(
+                &mut output,
+                "https://twitch.tv/{name: <name_max$}",
+                name = stream.user_name,
+                name_max = name_max,
+            )?,
+            Column::Title => write!(&mut output, "{title}", title = stream.title)?,
+        }
+    }
+
+    Ok(output)
+}
+
 fn main() -> anyhow::Result<()> {
     let secrets = get_secrets()?;
     let args = Args::parse()?;
@@ -285,91 +411,11 @@ fn main() -> anyhow::Result<()> {
     }
 
     for streams in streams.values_mut() {
-        streams.sort_unstable_by(|left, right| {
-            use {Column::*, Direction::*};
-
-            args.sort
-                .as_ref()
-                .map(|sort| {
-                    let &SortAction { column, direction } = sort;
-                    let ordering = match column {
-                        Viewers => left.viewer_count.cmp(&right.viewer_count),
-                        Uptime => left.uptime.cmp(&right.uptime),
-                        // invert this so its a->z not z->a
-                        Name => right.user_name.cmp(&left.user_name),
-                        _ => unreachable!(),
-                    };
-
-                    match direction {
-                        Descending => ordering,
-                        Ascending => ordering.reverse(),
-                    }
-                })
-                .unwrap_or_else(|| left.viewer_count.cmp(&right.viewer_count))
-        });
+        sort_streams(streams, args.sort)
     }
 
-    #[derive(Default)]
-    struct Pad {
-        viewers: usize,
-        name: usize,
-        timestamp: usize,
-    }
-
-    let Pad {
-        viewers: viewers_max,
-        name: name_max,
-        timestamp: timestamp_max,
-    } = streams
-        .values()
-        .flatten()
-        .fold(Pad::default(), |mut p, stream| {
-            p.viewers = p.viewers.max(stream.viewer_count as usize);
-            p.name = p.name.max(stream.user_name.len());
-            p.timestamp = p.timestamp.max(stream.started_at.len());
-            p
-        });
-    let viewers_max = count_digits(viewers_max as u64);
-    let timestamp_max = "uptime".len().max(timestamp_max);
-
-    use std::fmt::Write as _;
-    let mut title = String::new();
-    for column in &args.visible_columns {
-        if !title.is_empty() {
-            title.push_str(" | ");
-        }
-
-        match column {
-            Column::Viewers => {
-                write!(
-                    &mut title,
-                    "{viewers: >viewers_max$}",
-                    viewers = " ",
-                    viewers_max = viewers_max
-                )?;
-            }
-            Column::Uptime => {
-                write!(
-                    &mut title,
-                    "{uptime: ^timestamp_max$}",
-                    uptime = "uptime",
-                    timestamp_max = timestamp_max,
-                )?;
-            }
-            Column::Name => {
-                write!(
-                    &mut title,
-                    "{link: ^name_max$}",
-                    link = "link",
-                    name_max = name_max + "https://twitch.tv/".len()
-                )?;
-            }
-            Column::Title => {
-                write!(&mut title, "title")?;
-            }
-        }
-    }
-    let line = format!("{:->max$}", "", max = title.len());
+    let pad = calculate_column_padding(streams.values().flatten());
+    let Header { header, line } = calculate_header(&args.visible_columns, &pad)?;
 
     for (n, (category, streams)) in args
         .query
@@ -383,47 +429,11 @@ fn main() -> anyhow::Result<()> {
                     println!()
                 }
                 println!("streams for '{category}'", category = category);
-                println!("{}", title);
+                println!("{}", header);
                 println!("{}", line);
             }
 
-            let mut output = String::new();
-            for column in &args.visible_columns {
-                if !output.is_empty() {
-                    output.push_str(" | ")
-                }
-
-                match column {
-                    Column::Viewers => {
-                        write!(
-                            &mut output,
-                            "{viewers: >viewers_max$}",
-                            viewers = stream.viewer_count,
-                            viewers_max = viewers_max,
-                        )?;
-                    }
-                    Column::Uptime => {
-                        write!(
-                            &mut output,
-                            "{started_at: >timestamp_max$}",
-                            started_at = stream.started_at,
-                            timestamp_max = timestamp_max,
-                        )?;
-                    }
-                    Column::Name => {
-                        write!(
-                            &mut output,
-                            "https://twitch.tv/{name: <name_max$}",
-                            name = stream.user_name,
-                            name_max = name_max,
-                        )?;
-                    }
-                    Column::Title => {
-                        write!(&mut output, "{title}", title = stream.title)?;
-                    }
-                }
-            }
-
+            let output = calculate_actual_line(stream, &args.visible_columns, &pad)?;
             println!("{}", output);
         }
     }
