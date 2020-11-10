@@ -5,3 +5,4 @@ FLAGS:
     -h, --help              show the help message
     -v, --version           show the current version
     -s, --sort <col, dir?>  sort by <col> in the optional <dir>
+    -j, --json              dumps the results as json

@@ -12,7 +12,7 @@ struct Pagination {
     cursor: String,
 }
 
-#[derive(serde::Deserialize)]
+#[derive(serde::Deserialize, serde::Serialize)]
 struct Stream {
     started_at: String,
     title: String,
@@ -92,6 +92,7 @@ fn parse_sort_flag(flag: &str) -> anyhow::Result<SortAction> {
 struct Args {
     sort: Option<SortAction>,
     query: Vec<String>,
+    json: bool,
 }
 
 impl Args {
@@ -111,9 +112,10 @@ impl Args {
             std::process::exit(0);
         }
 
+        let json = args.contains(["-j", "--json"]);
         let sort = args.opt_value_from_fn(["-s", "--sort"], parse_sort_flag)?;
         let query = args.free()?;
-        Ok(Self { sort, query })
+        Ok(Self { sort, query, json })
     }
 
     fn print_short_help() {
@@ -248,6 +250,12 @@ fn main() -> anyhow::Result<()> {
             map
         },
     );
+
+    if args.json {
+        let s = serde_json::to_string_pretty(&streams)?;
+        println!("{}", s);
+        std::process::exit(0)
+    }
 
     for streams in streams.values_mut() {
         streams.sort_unstable_by(|left, right| {
