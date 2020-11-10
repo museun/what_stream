@@ -18,7 +18,7 @@ you can get these from the Twitch developer console (_hint_ or your browser if y
 
 this'll look for streams with 'c++' or 'python' or 'rust' in their title.
 
-`> what_stream c++ python rust"`
+`> what_stream c++ python rust`
 
 ```
 streams for 'c++'
