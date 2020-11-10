@@ -36,11 +36,21 @@ fn main() -> anyhow::Result<()> {
         eprintln!("provide a title to search for");
         std::process::exit(1)
     }
-    let query = query.split(',').collect::<Vec<_>>();
+
+    fn remove_word_boundaries(s: &str) -> &str {
+        const PAT: &str = ",.!?-";
+        s.trim_end_matches(PAT).trim()
+    }
+
+    let query = query
+        .split(',')
+        .map(remove_word_boundaries)
+        .filter(|s| !s.is_empty())
+        .collect::<Vec<_>>();
 
     let mut after = String::new();
     let mut streams = std::iter::from_fn(|| {
-        let resp = attohttpc::get("https://api.twitch.tv/helix/streams")
+        let resp: Resp<Stream> = attohttpc::get("https://api.twitch.tv/helix/streams")
             .param("game_id", "509670") // TODO this is hardcoded (for 'science and technology')
             .param("first", "100")
             .param("after", &after)
@@ -48,7 +58,7 @@ fn main() -> anyhow::Result<()> {
             .bearer_auth(&bearer_oauth)
             .send()
             .ok()?
-            .json::<Resp<Stream>>()
+            .json()
             .ok()?;
 
         match resp.data.is_empty() {
@@ -64,7 +74,7 @@ fn main() -> anyhow::Result<()> {
         for part in stream
             .title
             .split(' ')
-            .map(|s| s.trim_end_matches(",.!?-"))
+            .filter(|s| !s.is_empty())
             .map(|s| s.to_lowercase())
         {
             for q in &query {
