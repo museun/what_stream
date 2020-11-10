@@ -8,10 +8,10 @@ QUERY:
     e.g. 'opengl' will match 'OpenGL' in a title: "making a game with OpenGL"
 
 COLUMNS:
-    available visible columns: viewers, uptime, name, title
+    available visible columns: viewers, uptime, link, title
     if -c,--columns is not used then all columns are visible
     otherwise, only the specified columns are visible
-    e.g. `-c name -c link` will only show the `name` and `link` columns
+    e.g. `-c uptime -c link` will only show the `uptime` and `link` columns
 
 NOTES:
     the following environment variables must be set:

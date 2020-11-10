@@ -122,7 +122,7 @@ impl Args {
             Ok(match s {
                 "viewers" => Column::Viewers,
                 "uptime" => Column::Uptime,
-                "name" => Column::Name,
+                "link" => Column::Name,
                 "title" => Column::Title,
                 name => anyhow::bail!("invalid column: {}", name),
             })
