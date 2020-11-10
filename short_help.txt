@@ -6,4 +6,5 @@ FLAGS:
     -v, --version           show the current version
     -s, --sort <col, dir?>  sort by <col> in the optional <dir>
     -c, --column <name>     enable this column
+    -nh, --no-header        disables the column headers
     -j, --json              dumps the results as json

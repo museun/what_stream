@@ -96,6 +96,7 @@ struct Args {
     sort: Option<SortAction>,
     visible_columns: Vec<Column>,
     query: Vec<String>,
+    headers: bool,
     json: bool,
 }
 
@@ -117,6 +118,7 @@ impl Args {
         }
 
         let json = args.contains(["-j", "--json"]);
+        let headers = args.contains(["-nh", "--no-header"]);
         let sort = args.opt_value_from_fn(["-s", "--sort"], parse_sort_flag)?;
         let mut columns = args.values_from_fn(["-c", "--column"], |s| {
             Ok(match s {
@@ -143,6 +145,7 @@ impl Args {
             query,
             json,
             visible_columns,
+            headers: !headers,
         })
     }
 
@@ -415,7 +418,11 @@ fn main() -> anyhow::Result<()> {
     }
 
     let pad = calculate_column_padding(streams.values().flatten());
-    let Header { header, line } = calculate_header(&args.visible_columns, &pad)?;
+    let header = if args.headers {
+        Some(calculate_header(&args.visible_columns, &pad)?)
+    } else {
+        None
+    };
 
     for (n, (category, streams)) in args
         .query
@@ -429,8 +436,10 @@ fn main() -> anyhow::Result<()> {
                     println!()
                 }
                 println!("streams for '{category}'", category = category);
-                println!("{}", header);
-                println!("{}", line);
+                if let Some(Header { header, line }) = &header {
+                    println!("{}", header);
+                    println!("{}", line);
+                }
             }
 
             let output = calculate_actual_line(stream, &args.visible_columns, &pad)?;
