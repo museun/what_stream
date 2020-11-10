@@ -6,6 +6,7 @@ struct Resp<T> {
     data: Vec<T>,
     pagination: Pagination,
 }
+
 #[derive(Default, serde::Deserialize)]
 struct Pagination {
     #[serde(default)]
@@ -52,11 +53,12 @@ struct SortAction {
     direction: Direction,
 }
 
-#[derive(Debug, Copy, Clone, PartialOrd, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialOrd, PartialEq, Ord, Eq)]
 enum Column {
     Viewers,
     Uptime,
     Name,
+    Title,
 }
 
 #[derive(Debug, Copy, Clone, PartialOrd, PartialEq)]
@@ -91,6 +93,7 @@ fn parse_sort_flag(flag: &str) -> anyhow::Result<SortAction> {
 #[derive(Debug)]
 struct Args {
     sort: Option<SortAction>,
+    visible_columns: Vec<Column>,
     query: Vec<String>,
     json: bool,
 }
@@ -114,8 +117,32 @@ impl Args {
 
         let json = args.contains(["-j", "--json"]);
         let sort = args.opt_value_from_fn(["-s", "--sort"], parse_sort_flag)?;
+        let mut columns = args.values_from_fn(["-c", "--column"], |s| {
+            Ok(match s {
+                "viewers" => Column::Viewers,
+                "uptime" => Column::Uptime,
+                "name" => Column::Name,
+                "title" => Column::Title,
+                name => anyhow::bail!("invalid column: {}", name),
+            })
+        })?;
+
+        columns.dedup();
+        columns.sort();
+
+        let visible_columns = if columns.is_empty() {
+            vec![Column::Viewers, Column::Uptime, Column::Name, Column::Title]
+        } else {
+            columns
+        };
+
         let query = args.free()?;
-        Ok(Self { sort, query, json })
+        Ok(Self {
+            sort,
+            query,
+            json,
+            visible_columns,
+        })
     }
 
     fn print_short_help() {
@@ -270,6 +297,7 @@ fn main() -> anyhow::Result<()> {
                         Uptime => left.uptime.cmp(&right.uptime),
                         // invert this so its a->z not z->a
                         Name => right.user_name.cmp(&left.user_name),
+                        _ => unreachable!(),
                     };
 
                     match direction {
@@ -304,16 +332,43 @@ fn main() -> anyhow::Result<()> {
     let viewers_max = count_digits(viewers_max as u64);
     let timestamp_max = "uptime".len().max(timestamp_max);
 
-    let title = format!(
-        "{viewers: >max_viewers$} | {uptime: ^max_timestamp$} | {link: ^max_name$} | title",
-        viewers = " ",
-        uptime = "uptime",
-        link = "link",
-        max_viewers = viewers_max,
-        max_timestamp = timestamp_max,
-        max_name = name_max + "https://twitch.tv/".len(),
-    );
+    use std::fmt::Write as _;
+    let mut title = String::new();
+    for column in &args.visible_columns {
+        if !title.is_empty() {
+            title.push_str(" | ");
+        }
 
+        match column {
+            Column::Viewers => {
+                write!(
+                    &mut title,
+                    "{viewers: >viewers_max$}",
+                    viewers = " ",
+                    viewers_max = viewers_max
+                )?;
+            }
+            Column::Uptime => {
+                write!(
+                    &mut title,
+                    "{uptime: ^timestamp_max$}",
+                    uptime = "uptime",
+                    timestamp_max = timestamp_max,
+                )?;
+            }
+            Column::Name => {
+                write!(
+                    &mut title,
+                    "{link: ^name_max$}",
+                    link = "link",
+                    name_max = name_max + "https://twitch.tv/".len()
+                )?;
+            }
+            Column::Title => {
+                write!(&mut title, "title")?;
+            }
+        }
+    }
     let line = format!("{:->max$}", "", max = title.len());
 
     for (n, (category, streams)) in args
@@ -327,21 +382,49 @@ fn main() -> anyhow::Result<()> {
                 if n > 0 {
                     println!()
                 }
-                println!("streams for '{category}'", category = category,);
+                println!("streams for '{category}'", category = category);
                 println!("{}", title);
                 println!("{}", line);
             }
 
-            println!(
-                "{viewers: >max_viewers$} | {started_at: >max_timestamp$} | https://twitch.tv/{name: <max_name$} | {title}",
-                viewers = stream.viewer_count,
-                started_at = stream.started_at,
-                title = stream.title,
-                name = stream.user_name,
-                max_viewers = viewers_max,
-                max_timestamp = timestamp_max,
-                max_name = name_max,
-            );
+            let mut output = String::new();
+            for column in &args.visible_columns {
+                if !output.is_empty() {
+                    output.push_str(" | ")
+                }
+
+                match column {
+                    Column::Viewers => {
+                        write!(
+                            &mut output,
+                            "{viewers: >viewers_max$}",
+                            viewers = stream.viewer_count,
+                            viewers_max = viewers_max,
+                        )?;
+                    }
+                    Column::Uptime => {
+                        write!(
+                            &mut output,
+                            "{started_at: >timestamp_max$}",
+                            started_at = stream.started_at,
+                            timestamp_max = timestamp_max,
+                        )?;
+                    }
+                    Column::Name => {
+                        write!(
+                            &mut output,
+                            "https://twitch.tv/{name: <name_max$}",
+                            name = stream.user_name,
+                            name_max = name_max,
+                        )?;
+                    }
+                    Column::Title => {
+                        write!(&mut output, "{title}", title = stream.title)?;
+                    }
+                }
+            }
+
+            println!("{}", output);
         }
     }
 
