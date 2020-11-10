@@ -1,6 +1,12 @@
 # what_stream
 
-simply provide this a comma separated list of tags and it'll list programming streams that match
+simply provide this a query to search for and it'll list programming streams that match
+
+a query is a comma separated list of words.
+
+e.g. `"c++,rust,gamedev"`
+
+the `query` will match words in the stream title. the query is case-insensitive. so `opengl` will match `OpenGL`
 
 ## requirements
 
@@ -10,7 +16,10 @@ you can get these from the Twitch developer console (_hint_ or your browser if y
 
 ## usage
 
-> what_stream c++,python,rust
+
+this'll look for streams with 'c++' or 'python' or 'rust' in their title.
+
+`> what_stream "c++,python,rust"`
 
 ```
 streams for 'c++'
