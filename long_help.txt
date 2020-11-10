@@ -1,0 +1,17 @@
+SORTING:
+    available columns: viewers, uptime, name
+    available directions: ascending, descending (the default)
+
+QUERY:
+    query is a space separated list of 'tags' to filter by.
+    the tags are case-insensitive and will match 'words' in the stream title
+    e.g. 'opengl' will match 'OpenGL' in a title: "making a game with OpenGL"
+
+NOTES:
+    the following environment variables must be set:
+
+    WHAT_STREAM_CLIENT_ID
+    - your Twitch api Client-ID
+
+    WHAT_STREAM_BEARER_OAUTH
+    - an associated bearer OAuth from the Client-ID
