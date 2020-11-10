@@ -298,7 +298,7 @@ fn calculate_column_padding<'a>(iter: impl Iterator<Item = &'a Stream> + 'a) -> 
         p.timestamp = p.timestamp.max(stream.started_at.len());
         p
     });
-    pad.viewers = count_digits(pad.viewers as u64);
+    pad.viewers = "viewers".len().max(count_digits(pad.viewers as u64));
     pad.timestamp = "uptime".len().max(pad.timestamp);
     pad
 }
@@ -324,7 +324,7 @@ fn calculate_header(visible: &[Column], pad: &Pad) -> anyhow::Result<Header> {
             Column::Viewers => write!(
                 &mut header,
                 "{viewers: >viewers_max$}",
-                viewers = " ",
+                viewers = "viewers",
                 viewers_max = viewers_max
             )?,
             Column::Uptime => write!(
