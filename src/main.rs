@@ -1,32 +1,8 @@
+#![cfg_attr(debug_assertions, allow(dead_code,))]
+
 use anyhow::Context;
 use std::collections::HashMap;
-use std::fmt::Write as _;
-
-#[derive(serde::Deserialize)]
-struct Resp<T> {
-    data: Vec<T>,
-    pagination: Pagination,
-}
-
-#[derive(Default, serde::Deserialize)]
-struct Pagination {
-    #[serde(default)]
-    cursor: String,
-}
-
-#[derive(serde::Deserialize, serde::Serialize)]
-struct Stream {
-    started_at: String,
-    title: String,
-    user_name: String,
-    viewer_count: i64,
-
-    #[allow(dead_code)]
-    language: String,
-
-    #[serde(skip)]
-    uptime: i64,
-}
+use std::io::Write;
 
 const fn count_digits(d: u64) -> usize {
     let (mut len, mut n) = (1, 1u64);
@@ -54,6 +30,32 @@ struct SortAction {
     direction: Direction,
 }
 
+impl std::str::FromStr for SortAction {
+    type Err = anyhow::Error;
+    fn from_str(flag: &str) -> anyhow::Result<Self> {
+        let mut iter = flag.splitn(2, ',');
+        let head = iter.next().with_context(|| "a column must be provided")?;
+        let column = match head {
+            "viewers" => Column::Viewers,
+            "uptime" => Column::Uptime,
+            "name" => Column::Name,
+            name => anyhow::bail!("invalid column: {}", name),
+        };
+
+        let direction = iter
+            .next()
+            .map(|tail| match tail {
+                "asc" | "ascending" => Ok(Direction::Ascending),
+                "desc" | "descending" | "" => Ok(Direction::Descending),
+                dir => anyhow::bail!("invalid direction: {}", dir),
+            })
+            .transpose()?
+            .unwrap_or(Direction::Descending);
+
+        Ok(Self { column, direction })
+    }
+}
+
 #[derive(Debug, Copy, Clone, PartialOrd, PartialEq, Ord, Eq)]
 enum Column {
     Viewers,
@@ -68,36 +70,12 @@ enum Direction {
     Ascending,
 }
 
-fn parse_sort_flag(flag: &str) -> anyhow::Result<SortAction> {
-    let mut iter = flag.splitn(2, ',');
-    let head = iter.next().with_context(|| "a column must be provided")?;
-    let column = match head {
-        "viewers" => Column::Viewers,
-        "uptime" => Column::Uptime,
-        "name" => Column::Name,
-        name => anyhow::bail!("invalid column: {}", name),
-    };
-
-    let direction = iter
-        .next()
-        .map(|tail| match tail {
-            "asc" | "ascending" => Ok(Direction::Ascending),
-            "desc" | "descending" | "" => Ok(Direction::Descending),
-            dir => anyhow::bail!("invalid direction: {}", dir),
-        })
-        .transpose()?
-        .unwrap_or(Direction::Descending);
-
-    Ok(SortAction { column, direction })
-}
-
 #[derive(Debug)]
 struct Args {
     sort: Option<SortAction>,
-    visible_columns: Vec<Column>,
     query: Vec<String>,
-    headers: bool,
     json: bool,
+    style: Style,
 }
 
 impl Args {
@@ -118,34 +96,23 @@ impl Args {
         }
 
         let json = args.contains(["-j", "--json"]);
-        let headers = args.contains(["-nh", "--no-header"]);
-        let sort = args.opt_value_from_fn(["-s", "--sort"], parse_sort_flag)?;
-        let mut columns = args.values_from_fn(["-c", "--column"], |s| {
-            Ok(match s {
-                "viewers" => Column::Viewers,
-                "uptime" => Column::Uptime,
-                "link" => Column::Name,
-                "title" => Column::Title,
-                name => anyhow::bail!("invalid column: {}", name),
-            })
-        })?;
+        let sort = args.opt_value_from_str(["-s", "--sort"])?;
 
-        columns.dedup();
-        columns.sort();
-
-        let visible_columns = if columns.is_empty() {
-            vec![Column::Viewers, Column::Uptime, Column::Name, Column::Title]
-        } else {
-            columns
-        };
+        let style = args
+            .opt_value_from_fn(["-t", "--style"], |s| match s {
+                "fancy" => Ok(Style::FANCY),
+                "box" => Ok(Style::BOX),
+                "none" => Ok(Style::NONE),
+                s => anyhow::bail!("unknown style: {}", s),
+            })?
+            .unwrap_or(Style::BOX);
 
         let query = args.free()?;
         Ok(Self {
             sort,
             query,
             json,
-            visible_columns,
-            headers: !headers,
+            style,
         })
     }
 
@@ -172,20 +139,36 @@ struct Secrets {
     bearer_oauth: String,
 }
 
-fn get_secrets() -> anyhow::Result<Secrets> {
-    let client_id = std::env::var("WHAT_STREAM_CLIENT_ID").unwrap_or_else(|_| {
-        eprintln!("please set 'WHAT_STREAM_CLIENT_ID' to your Twitch Client ID");
-        std::process::exit(1)
-    });
-    let bearer_oauth = std::env::var("WHAT_STREAM_BEARER_OAUTH").unwrap_or_else(|_| {
-        eprintln!("please set 'WHAT_STREAM_BEARER_OAUTH' to your Twitch Bearer OAuth token");
-        std::process::exit(1)
-    });
+impl Secrets {
+    fn get() -> anyhow::Result<Self> {
+        let client_id = std::env::var("WHAT_STREAM_CLIENT_ID").unwrap_or_else(|_| {
+            eprintln!("please set 'WHAT_STREAM_CLIENT_ID' to your Twitch Client ID");
+            std::process::exit(1)
+        });
+        let bearer_oauth = std::env::var("WHAT_STREAM_BEARER_OAUTH").unwrap_or_else(|_| {
+            eprintln!("please set 'WHAT_STREAM_BEARER_OAUTH' to your Twitch Bearer OAuth token");
+            std::process::exit(1)
+        });
 
-    Ok(Secrets {
-        client_id,
-        bearer_oauth,
-    })
+        Ok(Self {
+            client_id,
+            bearer_oauth,
+        })
+    }
+}
+
+#[derive(serde::Deserialize, serde::Serialize)]
+struct Stream {
+    started_at: String,
+    title: String,
+    user_name: String,
+    viewer_count: i64,
+
+    #[allow(dead_code)]
+    language: String,
+
+    #[serde(skip)]
+    uptime: i64,
 }
 
 fn fetch_streams<'a>(
@@ -195,6 +178,18 @@ fn fetch_streams<'a>(
         bearer_oauth,
     }: &Secrets,
 ) -> anyhow::Result<Vec<(&'a String, Stream)>> {
+    #[derive(serde::Deserialize)]
+    struct Resp<T> {
+        data: Vec<T>,
+        pagination: Pagination,
+    }
+
+    #[derive(Default, serde::Deserialize)]
+    struct Pagination {
+        #[serde(default)]
+        cursor: String,
+    }
+
     let mut after = String::new();
     let mut streams = std::iter::from_fn(|| {
         let resp: Resp<Stream> = attohttpc::get("https://api.twitch.tv/helix/streams")
@@ -241,23 +236,29 @@ fn fetch_streams<'a>(
             (i.next().unwrap(), i.next().unwrap())
         };
 
-        let d = time::OffsetDateTime::now_utc()
+        let duration = time::OffsetDateTime::now_utc()
             - time::OffsetDateTime::parse(
                 format!("{} {} +0000", date, &time_[..time_.len() - 1]),
                 "%F %T %z",
             )
             .unwrap();
 
-        let h = (d.whole_seconds() / 60) / 60;
-        let m = (d.whole_seconds() / 60) % 60;
+        // TODO do this do differently
+        let seconds = duration.whole_seconds();
+        let hours = (seconds / 60) / 60;
+        let minutes = (seconds / 60) % 60;
 
-        let started = if h > 0 {
-            format!("{h}h {m}m", h = h, m = m)
+        let started = if hours > 0 {
+            format!(
+                "{hours} hours {minutes} minutes",
+                hours = hours,
+                minutes = minutes
+            )
         } else {
-            format!("{m}m", m = m)
+            format!("{minutes} minutes", minutes = minutes)
         };
 
-        stream.uptime = d.whole_seconds();
+        stream.uptime = seconds;
         stream.started_at = started;
     });
 
@@ -279,122 +280,256 @@ fn sort_streams(streams: &mut Vec<Stream>, option: Option<SortAction>) {
                 };
 
                 match direction {
-                    Descending => ordering,
-                    Ascending => ordering.reverse(),
+                    Ascending => ordering,
+                    Descending => ordering.reverse(),
                 }
             })
             .unwrap_or_else(|| left.viewer_count.cmp(&right.viewer_count))
     });
 }
 
-#[derive(Default)]
-struct Pad {
-    viewers: usize,
-    name: usize,
-    timestamp: usize,
+trait Render {
+    fn render(&self, writer: &mut dyn Write, style: &Style, theme: &Theme) -> anyhow::Result<()>;
 }
 
-fn calculate_column_padding<'a>(iter: impl Iterator<Item = &'a Stream> + 'a) -> Pad {
-    let mut pad = iter.fold(Pad::default(), |mut p, stream| {
-        p.viewers = p.viewers.max(stream.viewer_count as usize);
-        p.name = p.name.max(stream.user_name.len());
-        p.timestamp = p.timestamp.max(stream.started_at.len());
-        p
-    });
-    pad.viewers = "viewers".len().max(count_digits(pad.viewers as u64));
-    pad.timestamp = "uptime".len().max(pad.timestamp);
-    pad
+#[derive(Copy, Clone, Debug)]
+struct Style {
+    top: &'static str,
+    entry_sep: &'static str,
+    end: &'static str,
+
+    link: &'static str,
+
+    title: &'static str,
+    continuation: &'static str,
+
+    uptime: &'static str,
+    viewers: &'static str,
 }
 
-struct Header {
-    header: String,
-    line: String,
+impl Style {
+    const NONE: Style = Style {
+        top: "",
+        entry_sep: "",
+        end: "",
+
+        link: "",
+
+        title: "",
+        continuation: "",
+
+        uptime: "",
+        viewers: "",
+    };
+
+    const BOX: Style = Style {
+        top: "┌── ",
+        entry_sep: "│",
+        end: "└ ",
+
+        link: "├ ",
+
+        title: "├ ",
+        continuation: "│ ",
+
+        uptime: "├ ",
+        viewers: "├ ",
+    };
+
+    const FANCY: Style = Style {
+        top: "╭╍╍ ",
+        entry_sep: "╎",
+        end: "╰╍ ",
+
+        link: "╞═ ",
+
+        title: "├┄ ",
+        continuation: "┆ ",
+
+        uptime: "├┄ ",
+        viewers: "├┄ ",
+    };
 }
 
-fn calculate_header(visible: &[Column], pad: &Pad) -> anyhow::Result<Header> {
-    let Pad {
-        viewers: viewers_max,
-        name: name_max,
-        timestamp: timestamp_max,
-    } = pad;
+enum LinePartition<'a> {
+    Start(&'a str),
+    Continuation(&'a str),
+}
 
-    let mut header = String::new();
-    for column in visible {
-        if !header.is_empty() {
-            header.push_str(" | ");
+fn partition_line(
+    input: &str,
+    max: usize,
+    left: usize,
+) -> impl Iterator<Item = LinePartition<'_>> + '_ {
+    use {
+        unicode_segmentation::UnicodeSegmentation as _, //
+        unicode_width::UnicodeWidthStr as _,
+    };
+    let mut budget = max;
+    input.split_word_bounds().map(move |word| {
+        let width = word.width();
+        match budget.checked_sub(width) {
+            Some(n) => {
+                budget = n;
+                LinePartition::Continuation(word)
+            }
+            None => {
+                budget = max - width - left;
+                LinePartition::Start(word)
+            }
         }
-        match column {
-            Column::Viewers => write!(
-                &mut header,
-                "{viewers: >viewers_max$}",
-                viewers = "viewers",
-                viewers_max = viewers_max
-            )?,
-            Column::Uptime => write!(
-                &mut header,
-                "{uptime: ^timestamp_max$}",
-                uptime = "uptime",
-                timestamp_max = timestamp_max,
-            )?,
-            Column::Name => write!(
-                &mut header,
-                "{link: ^name_max$}",
-                link = "link",
-                name_max = name_max + "https://twitch.tv/".len()
-            )?,
-            Column::Title => write!(&mut header, "title")?,
+    })
+}
+
+use yansi::Style as ColorStyle;
+
+struct Theme {
+    fringe: ColorStyle,
+    entry: ColorStyle,
+
+    category: ColorStyle,
+    link: ColorStyle,
+    title: ColorStyle,
+    uptime: ColorStyle,
+    viewers: ColorStyle,
+}
+
+// TODO more themes
+impl Default for Theme {
+    fn default() -> Self {
+        use yansi::Color;
+        Self {
+            fringe: ColorStyle::new(Color::Black).bold(),
+            entry: ColorStyle::new(Color::Black).bold(),
+
+            category: ColorStyle::new(Color::Magenta),
+            link: ColorStyle::new(Color::Blue).bold(),
+            title: ColorStyle::new(Color::Yellow).bold(),
+            uptime: ColorStyle::new(Color::Green),
+            viewers: ColorStyle::new(Color::Cyan),
         }
     }
-    let line = format!("{:->max$}", "", max = header.len());
-
-    Ok(Header { header, line })
 }
 
-fn calculate_actual_line(stream: &Stream, visible: &[Column], pad: &Pad) -> anyhow::Result<String> {
-    let Pad {
-        viewers: viewers_max,
-        name: name_max,
-        timestamp: timestamp_max,
-    } = pad;
+// TODO other renderers
 
-    let mut output = String::new();
-    for column in visible {
-        if !output.is_empty() {
-            output.push_str(" | ")
+struct Entries<'a> {
+    category: &'a str,
+    streams: &'a [Stream],
+}
+
+impl<'a> Render for Entries<'a> {
+    fn render(&self, writer: &mut dyn Write, style: &Style, theme: &Theme) -> anyhow::Result<()> {
+        use unicode_width::UnicodeWidthStr as _;
+
+        writeln!(
+            writer,
+            "{left}{category}",
+            category = theme.category.paint(&self.category),
+            left = theme.fringe.paint(style.top)
+        )?;
+
+        let title_left_len = style.title.len();
+
+        let max_width = width() - title_left_len;
+        for (n, stream) in self.streams.iter().enumerate() {
+            if n > 0 {
+                writeln!(writer, "{}", theme.entry.paint(&style.entry_sep))?;
+            }
+
+            writeln!(
+                writer,
+                "{left}https://twitch.tv/{link}",
+                link = theme.link.paint(&stream.user_name),
+                left = theme.fringe.paint(&style.link),
+            )?;
+
+            write!(writer, "{left}", left = theme.fringe.paint(style.title))?;
+
+            // if the title would wrap, partition it. but only if we're printing a left fringe
+            if stream.title.width() > max_width && !style.title.is_empty() {
+                for word in partition_line(&*stream.title, max_width, title_left_len) {
+                    match word {
+                        LinePartition::Continuation(word) => {
+                            write!(writer, "{}", theme.title.paint(word))?
+                        }
+                        LinePartition::Start(word) => {
+                            write!(
+                                writer,
+                                "\n{left}{sp: >title_left_len$}{word}",
+                                word = theme.title.paint(word.trim_start()),
+                                left = theme.fringe.paint(style.continuation),
+                                title_left_len = title_left_len - style.title.len(),
+                                sp = ""
+                            )?;
+                        }
+                    }
+                }
+                writeln!(writer)?;
+            } else {
+                // otherwise just write the title
+                writeln!(writer, "{}", theme.title.paint(&stream.title))?;
+            }
+
+            writeln!(
+                writer,
+                "{left}started {uptime} ago, {viewers} watching",
+                uptime = theme.uptime.paint(&stream.started_at),
+                viewers = theme.viewers.paint(&stream.viewer_count),
+                left = theme.fringe.paint(if n < self.streams.len() - 1 {
+                    style.viewers
+                } else {
+                    style.end
+                })
+            )?;
         }
 
-        match column {
-            Column::Viewers => write!(
-                &mut output,
-                "{viewers: >viewers_max$}",
-                viewers = stream.viewer_count,
-                viewers_max = viewers_max,
-            )?,
-            Column::Uptime => write!(
-                &mut output,
-                "{started_at: >timestamp_max$}",
-                started_at = stream.started_at,
-                timestamp_max = timestamp_max,
-            )?,
-            Column::Name => write!(
-                &mut output,
-                "https://twitch.tv/{name: <name_max$}",
-                name = stream.user_name,
-                name_max = name_max,
-            )?,
-            Column::Title => write!(&mut output, "{title}", title = stream.title)?,
-        }
+        Ok(())
     }
+}
 
-    Ok(output)
+fn width() -> usize {
+    terminal_size::terminal_size()
+        .map(|(terminal_size::Width(width), _)| width)
+        .map(usize::from)
+        .unwrap_or(40)
+}
+
+fn try_enable_colors() {
+    if std::env::var("NO_COLOR").is_ok() || (cfg!(windows) && !yansi::Paint::enable_windows_ascii())
+    {
+        yansi::Paint::disable();
+    } else {
+        yansi::Paint::enable();
+    }
+}
+
+fn render_streams<'a>(
+    out: &mut dyn Write,
+    style: &Style,
+    theme: &Theme,
+    streams: impl IntoIterator<Item = (String, &'a [Stream])>,
+) -> anyhow::Result<()> {
+    streams
+        .into_iter()
+        .enumerate()
+        .try_for_each(|(n, (category, streams))| {
+            if n > 0 {
+                writeln!(out)?;
+            }
+            Entries {
+                category: &category,
+                streams: &streams,
+            }
+            .render(out, style, theme)
+        })
 }
 
 fn main() -> anyhow::Result<()> {
-    let secrets = get_secrets()?;
+    let secrets = Secrets::get()?;
     let args = Args::parse()?;
 
     if args.query.is_empty() {
-        // TODO we could just print /all/ streams
         eprintln!("please provide something to filter by");
         std::process::exit(1)
     }
@@ -408,8 +543,7 @@ fn main() -> anyhow::Result<()> {
     );
 
     if args.json {
-        let s = serde_json::to_string_pretty(&streams)?;
-        println!("{}", s);
+        println!("{}", serde_json::to_string_pretty(&streams)?);
         std::process::exit(0)
     }
 
@@ -417,35 +551,14 @@ fn main() -> anyhow::Result<()> {
         sort_streams(streams, args.sort)
     }
 
-    let pad = calculate_column_padding(streams.values().flatten());
-    let header = if args.headers {
-        Some(calculate_header(&args.visible_columns, &pad)?)
-    } else {
-        None
-    };
+    try_enable_colors();
+    let out = std::io::stdout();
+    let mut out = out.lock();
 
-    for (n, (category, streams)) in args
+    let streams = args
         .query
-        .iter()
-        .filter_map(|q| streams.get(q).map(|s| (q, s)))
-        .enumerate()
-    {
-        for (i, stream) in streams.iter().rev().enumerate() {
-            if i == 0 {
-                if n > 0 {
-                    println!()
-                }
-                println!("streams for '{category}'", category = category);
-                if let Some(Header { header, line }) = &header {
-                    println!("{}", header);
-                    println!("{}", line);
-                }
-            }
+        .into_iter()
+        .filter_map(|q| streams.get(&*q).map(|s| (q, s.as_slice())));
 
-            let output = calculate_actual_line(stream, &args.visible_columns, &pad)?;
-            println!("{}", output);
-        }
-    }
-
-    Ok(())
+    render_streams(&mut out, &args.style, &Theme::default(), streams)
 }

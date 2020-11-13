@@ -5,6 +5,5 @@ FLAGS:
     -h, --help              show the help message
     -v, --version           show the current version
     -s, --sort <col, dir?>  sort by <col> in the optional <dir>
-    -c, --column <name>     enable this column
-    -nh, --no-header        disables the column headers
+    -t, --style <style>     what type of rendering style to use
     -j, --json              dumps the results as json

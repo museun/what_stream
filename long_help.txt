@@ -7,11 +7,10 @@ QUERY:
     the tags are case-insensitive and will match 'words' in the stream title
     e.g. 'opengl' will match 'OpenGL' in a title: "making a game with OpenGL"
 
-COLUMNS:
-    available visible columns: viewers, uptime, link, title
-    if -c,--columns is not used then all columns are visible
-    otherwise, only the specified columns are visible
-    e.g. `-c uptime -c link` will only show the `uptime` and `link` columns
+STYLES:
+    - none
+    - fancy
+    - box (the default)
 
 NOTES:
     the following environment variables must be set:
@@ -21,3 +20,5 @@ NOTES:
 
     WHAT_STREAM_BEARER_OAUTH
     - an associated bearer OAuth from the Client-ID
+
+    if NO_COLORS is set, the colors are disabled
