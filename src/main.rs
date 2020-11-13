@@ -4,18 +4,6 @@ use anyhow::Context;
 use std::collections::HashMap;
 use std::io::Write;
 
-const fn count_digits(d: u64) -> usize {
-    let (mut len, mut n) = (1, 1u64);
-    while len < 20 {
-        n *= 10;
-        if n > d {
-            return len;
-        }
-        len += 1;
-    }
-    len
-}
-
 fn trim_word_boundaries(s: &str) -> &str {
     const HEAD: &str = "([{";
     const TAIL: &str = ",.!?-:}])";
@@ -61,7 +49,6 @@ enum Column {
     Viewers,
     Uptime,
     Name,
-    Title,
 }
 
 #[derive(Debug, Copy, Clone, PartialOrd, PartialEq)]
