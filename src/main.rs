@@ -216,20 +216,14 @@ fn fetch_streams<'a>(
     .collect::<Vec<_>>();
 
     streams.iter_mut().for_each(|(_, stream)| {
-        let (date, time_) = {
-            let mut i = stream.started_at.split('T');
-            (i.next().unwrap(), i.next().unwrap())
-        };
-
-        let duration = time::OffsetDateTime::now_utc()
-            - time::OffsetDateTime::parse(
-                format!("{} {} +0000", date, &time_[..time_.len() - 1]),
-                "%F %T %z",
-            )
-            .unwrap();
+        let duration: chrono::Duration = chrono::Utc::now()
+            - stream
+                .started_at
+                .parse::<chrono::DateTime<chrono::Utc>>()
+                .unwrap();
 
         // TODO do this do differently
-        let seconds = duration.whole_seconds();
+        let seconds = duration.num_seconds();
         let hours = (seconds / 60) / 60;
         let minutes = (seconds / 60) % 60;
 

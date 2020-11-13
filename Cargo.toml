@@ -8,11 +8,11 @@ license = "0BSD"
 [dependencies]
 anyhow = "1.0.34"
 attohttpc = { version = "0.16.0", default-features = false, features = ["json", "tls"] }
+chrono = { version = "0.4.19", default-features = false, features = ["clock"] }
 pico-args = "0.3.4"
 serde = { version = "1.0.117", features = ["derive"] }
 serde_json = "1.0.59"
 terminal_size = "0.1.13"
-time = "0.2.22"
 unicode-segmentation = "1.6.0"
 unicode-width = "0.1.8"
 yansi = "0.5.0"
