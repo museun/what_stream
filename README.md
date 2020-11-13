@@ -14,33 +14,41 @@ you must set `WHAT_STREAM_CLIENT_ID` and `WHAT_STREAM_BEARER_OAUTH` to their app
 
 you can get these from the Twitch developer console (_hint_ or your browser if you know where to look)
 
-## usage
+## example
 
 this'll look for streams with 'c++' or 'python' or 'rust' in their title.
 
 `> what_stream c++ python rust`
 
 ```
-streams for 'c++'
-   | uptime |                link                | title
---------------------------------------------------------
- 3 | 2h 14m | https://twitch.tv/qm0auber         | C++: Dalga Boyu Temelli Renklendirme ve Isin Izleyici(Ray Tracer) 3
- 1 | 8h 34m | https://twitch.tv/SomewhatAccurate | Refactoring and cleaning. They call me the janitor. C++ / XML / Lua / OpenGL / GLFW / Glad / CMake / Github
+┌── python
+├ https://twitch.tv/Pydathon
+├ Python, scraping et data analyse :) !discord
+├ started 1 hours 21 minutes ago, 3 watching
+│
+├ https://twitch.tv/beginbot
+├ Vim Day! + [Go, Python, Linux] !me AMA
+└ started 1 hours 0 minutes ago, 53 watching
 
-streams for 'python'
-   | uptime |                link                | title
---------------------------------------------------------
- 1 |    11m | https://twitch.tv/mrdonbrown       | [Python] Django custom auth
-
-streams for 'rust'
-   | uptime |                link                | title
---------------------------------------------------------
-65 | 2h 11m | https://twitch.tv/rhymu8354        | 0423 -- Rust: WebSockets Autobahn Testsuite
- 2 |    30m | https://twitch.tv/museun           | random projects in Rust
-
+┌── rust
+├ https://twitch.tv/museun
+├ random projects in Rust
+├ started 2 hours 1 minutes ago, 2 watching
+│
+├ https://twitch.tv/Brookzerker
+├ Building a Pitfall clone in Rust + GGEZ
+├ started 1 hours 22 minutes ago, 4 watching
+│
+├ https://twitch.tv/togglebit
+├ Rust, Rantings and Ramblings: Friday fun! (whatever that means)
+└ started 8 hours 38 minutes ago, 53 watching
 ```
 
-### help
+**note** if a query does not match, it will not be displayed.
+
+also, try using one of the `--style` options
+
+## usage
 
 ```
 what_stream 0.1.0
@@ -52,7 +60,7 @@ FLAGS:
     -h, --help              show the help message
     -v, --version           show the current version
     -s, --sort <col, dir?>  sort by <col> in the optional <dir>
-    -c, --column <name>     enable this column
+    -t, --style <style>     what type of rendering style to use
     -j, --json              dumps the results as json
 
 SORTING:
@@ -64,11 +72,10 @@ QUERY:
     the tags are case-insensitive and will match 'words' in the stream title
     e.g. 'opengl' will match 'OpenGL' in a title: "making a game with OpenGL"
 
-COLUMNS:
-    available visible columns: viewers, uptime, name, title
-    if -c,--columns is not used then all columns are visible
-    otherwise, only the specified columns are visible
-    e.g. `-c name -c link` will only show the `name` and `link` columns
+STYLES:
+    - none
+    - fancy
+    - box (the default)
 
 NOTES:
     the following environment variables must be set:
@@ -78,6 +85,8 @@ NOTES:
 
     WHAT_STREAM_BEARER_OAUTH
     - an associated bearer OAuth from the Client-ID
+
+    if NO_COLORS is set, the colors are disabled
 ```
 
 ## license
