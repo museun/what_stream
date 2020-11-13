@@ -1,5 +1,3 @@
-#![cfg_attr(debug_assertions, allow(dead_code,))]
-
 use anyhow::Context;
 use std::collections::HashMap;
 use std::io::Write;
@@ -263,7 +261,6 @@ fn sort_streams(streams: &mut Vec<Stream>, option: Option<SortAction>) {
                     Uptime => left.uptime.cmp(&right.uptime),
                     // invert this so its a->z not z->a
                     Name => right.user_name.cmp(&left.user_name),
-                    _ => unreachable!(),
                 };
 
                 match direction {
@@ -295,7 +292,7 @@ struct Style {
 }
 
 impl Style {
-    const NONE: Style = Style {
+    const NONE: Self = Self {
         top: "",
         entry_sep: "",
         end: "",
@@ -309,7 +306,7 @@ impl Style {
         viewers: "",
     };
 
-    const BOX: Style = Style {
+    const BOX: Self = Self {
         top: "┌── ",
         entry_sep: "│",
         end: "└ ",
@@ -323,7 +320,7 @@ impl Style {
         viewers: "├ ",
     };
 
-    const FANCY: Style = Style {
+    const FANCY: Self = Self {
         top: "╭╍╍ ",
         entry_sep: "╎",
         end: "╰╍ ",
@@ -506,7 +503,7 @@ fn render_streams<'a>(
             }
             Entries {
                 category: &category,
-                streams: &streams,
+                streams,
             }
             .render(out, style, theme)
         })
