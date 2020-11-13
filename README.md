@@ -51,7 +51,7 @@ also, try using one of the `--style` options
 ## usage
 
 ```
-what_stream 0.1.0
+what_stream 0.2.0
 
 USAGE:
     what_stream [flags] [query ..]
@@ -64,8 +64,17 @@ FLAGS:
     -j, --json              dumps the results as json
 
 SORTING:
-    available columns: viewers, uptime, name
-    available directions: ascending, descending (the default)
+    available columns:
+     - name (the default)
+     - viewers
+     - uptime
+
+    available directions:
+     - descending (the default)
+     - desc (shorthand)
+
+     - ascending
+     - asc (shorthand)
 
 QUERY:
     query is a space separated list of 'tags' to filter by.
@@ -73,20 +82,19 @@ QUERY:
     e.g. 'opengl' will match 'OpenGL' in a title: "making a game with OpenGL"
 
 STYLES:
-    - none
-    - fancy
     - box (the default)
+    - fancy
+    - none
 
 NOTES:
-    the following environment variables must be set:
+    if NO_COLORS is set, the colors are disabled
 
+    the following environment variables must be set:
     WHAT_STREAM_CLIENT_ID
-    - your Twitch api Client-ID
+    - this your Twitch api Client-ID
 
     WHAT_STREAM_BEARER_OAUTH
-    - an associated bearer OAuth from the Client-ID
-
-    if NO_COLORS is set, the colors are disabled
+    - this is an associated bearer OAuth from the Client-ID
 ```
 
 ## license
