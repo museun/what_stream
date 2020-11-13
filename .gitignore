@@ -2,3 +2,4 @@
 .envrc
 *.html
 *.json
+.env

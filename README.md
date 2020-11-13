@@ -51,7 +51,7 @@ also, try using one of the `--style` options
 ## usage
 
 ```
-what_stream 0.2.0
+what_stream 0.2.2
 
 USAGE:
     what_stream [flags] [query ..]

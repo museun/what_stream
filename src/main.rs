@@ -175,23 +175,29 @@ fn fetch_streams<'a>(
         cursor: String,
     }
 
-    let mut after = String::new();
+    let agent = ureq::agent()
+        .set("client-id", client_id)
+        .auth_kind("Bearer", bearer_oauth)
+        .build();
+
+    let mut cursor = String::new();
     let mut streams = std::iter::from_fn(|| {
-        let resp: Resp<Stream> = attohttpc::get("https://api.twitch.tv/helix/streams")
-            .param("game_id", "509670") // TODO this is hardcoded (for 'science and technology')
-            .param("first", "100")
-            .param("after", &after)
-            .header("client-id", client_id)
-            .bearer_auth(bearer_oauth)
-            .send()
-            .ok()?
-            .json()
+        // XXX this is hardcoded (for 'science and technology')
+        const SCIENCE_AND_TECH: &str = "509670";
+
+        let resp: Resp<Stream> = agent
+            .get("https://api.twitch.tv/helix/streams")
+            .query("game_id", SCIENCE_AND_TECH)
+            .query("first", "100")
+            .query("after", &cursor)
+            .call()
+            .into_json_deserialize()
             .ok()?;
 
         match resp.data.is_empty() {
             true => None,
             false => {
-                after = resp.pagination.cursor;
+                cursor = resp.pagination.cursor;
                 Some(resp.data)
             }
         }
@@ -281,8 +287,7 @@ struct Style {
     title: &'static str,
     continuation: &'static str,
 
-    uptime: &'static str,
-    viewers: &'static str,
+    stats: &'static str,
 }
 
 impl Style {
@@ -296,8 +301,7 @@ impl Style {
         title: "",
         continuation: "",
 
-        uptime: "",
-        viewers: "",
+        stats: "",
     };
 
     const BOX: Self = Self {
@@ -310,8 +314,7 @@ impl Style {
         title: "├ ",
         continuation: "│ ",
 
-        uptime: "├ ",
-        viewers: "├ ",
+        stats: "├ ",
     };
 
     const FANCY: Self = Self {
@@ -322,10 +325,9 @@ impl Style {
         link: "╞═ ",
 
         title: "├┄ ",
-        continuation: "┆ ",
+        continuation: "┝ ",
 
-        uptime: "├┄ ",
-        viewers: "├┄ ",
+        stats: "├┄ ",
     };
 }
 
@@ -345,6 +347,7 @@ fn partition_line(
     };
     let mut budget = max;
     input.split_word_bounds().map(move |word| {
+        let word = word.trim_end_matches('\n');
         let width = word.width();
         match budget.checked_sub(width) {
             Some(n) => {
@@ -455,7 +458,7 @@ impl<'a> Render for Entries<'a> {
                 uptime = theme.uptime.paint(&stream.started_at),
                 viewers = theme.viewers.paint(&stream.viewer_count),
                 left = theme.fringe.paint(if n < self.streams.len() - 1 {
-                    style.viewers
+                    style.stats
                 } else {
                     style.end
                 })
