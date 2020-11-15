@@ -270,6 +270,9 @@ fn sort_streams(streams: &mut Vec<Stream>, option: Option<SortAction>) {
             })
             .unwrap_or_else(|| left.viewer_count.cmp(&right.viewer_count))
     });
+
+    // sometimes the api hiccups -- this'll ensure we'll just get uniques
+    streams.dedup_by(|a, b| a.user_name == b.user_name);
 }
 
 trait Render {
