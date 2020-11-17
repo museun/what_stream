@@ -12,11 +12,13 @@ the `query` will match words in the stream title. the query is case-insensitive.
 
 you must set `WHAT_STREAM_CLIENT_ID` and `WHAT_STREAM_BEARER_OAUTH` to their appropriate values.
 
+**note** the `BEARER_OAUTH` should just be the token, not the full `OAuth hexstring`
+
 you can get these from the Twitch developer console (_hint_ or your browser if you know where to look)
 
 ## example
 
-this'll look for streams with 'c++' or 'python' or 'rust' in their title.
+this'll look for streams with `c++` or `python` or `rust` in their title.
 
 `> what_stream c++ python rust`
 
@@ -51,7 +53,7 @@ also, try using one of the `--style` options
 ## usage
 
 ```
-what_stream 0.2.2
+what_stream 0.2.4
 
 USAGE:
     what_stream [flags] [query ..]
@@ -59,7 +61,7 @@ USAGE:
 FLAGS:
     -h, --help              show the help message
     -v, --version           show the current version
-    -s, --sort <col, dir?>  sort by <col> in the optional <dir>
+    -s, --sort <col,dir?>  sort by <col> in the optional <dir>
     -t, --style <style>     what type of rendering style to use
     -j, --json              dumps the results as json
 
