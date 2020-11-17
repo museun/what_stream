@@ -235,12 +235,18 @@ fn fetch_streams<'a>(
 
         let started = if hours > 0 {
             format!(
-                "{hours} hours {minutes} minutes",
+                "{hours} hour{h_plural} {minutes} minute{m_plural}",
                 hours = hours,
-                minutes = minutes
+                minutes = minutes,
+                h_plural = if hours > 1 { "s" } else { "" },
+                m_plural = if minutes > 1 { "s" } else { "" },
             )
         } else {
-            format!("{minutes} minutes", minutes = minutes)
+            format!(
+                "{minutes} minute{m_plural}",
+                minutes = minutes,
+                m_plural = if minutes > 1 { "s" } else { "" }
+            )
         };
 
         stream.uptime = seconds;
