@@ -104,14 +104,12 @@ impl Args {
     fn print_short_help() {
         Self::print_version();
         println!();
-        println!("{}", include_str!("../short_help.txt"));
+        println!("{}", include_str!("../assets/short_help.txt"));
     }
 
     fn print_long_help() {
-        Self::print_version();
-        println!();
-        println!("{}", include_str!("../short_help.txt"));
-        println!("{}", include_str!("../long_help.txt"));
+        Self::print_short_help();
+        println!("{}", include_str!("../assets/long_help.txt"));
     }
 
     fn print_version() {
