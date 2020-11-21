@@ -83,7 +83,6 @@ pub fn fetch_streams<'a>(
     .collect::<Vec<_>>();
 
     streams.iter_mut().for_each(|(_, stream)| {
-        eprintln!("{} | {}", stream.user_name, stream.user_id);
         let duration: chrono::Duration = chrono::Utc::now()
             - stream
                 .started_at
