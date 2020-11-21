@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use crate::args::{Column, Direction, Secrets, SortAction};
 
 #[derive(serde::Deserialize, serde::Serialize)]
@@ -5,6 +7,7 @@ pub struct Stream {
     pub started_at: String,
     pub title: String,
     pub user_name: String,
+    pub user_id: String,
     pub viewer_count: i64,
 
     #[allow(dead_code)]
@@ -80,6 +83,7 @@ pub fn fetch_streams<'a>(
     .collect::<Vec<_>>();
 
     streams.iter_mut().for_each(|(_, stream)| {
+        eprintln!("{} | {}", stream.user_name, stream.user_id);
         let duration: chrono::Duration = chrono::Utc::now()
             - stream
                 .started_at
@@ -110,6 +114,37 @@ pub fn fetch_streams<'a>(
         stream.uptime = seconds;
         stream.started_at = started;
     });
+
+    fn get_usernames<'b: 'a, 'a>(
+        agent: &ureq::Agent,
+        ids: impl Iterator<Item = &'b String> + 'a,
+    ) -> anyhow::Result<HashMap<String, String>> {
+        #[derive(serde::Deserialize)]
+        struct Resp<T> {
+            data: Vec<T>,
+        }
+
+        #[derive(serde::Deserialize)]
+        struct User {
+            id: String,
+            login: String,
+        }
+
+        let mut req = &mut agent.get("https://api.twitch.tv/helix/users");
+        for (k, v) in std::iter::repeat("id").zip(ids) {
+            req = req.query(k, v);
+        }
+        let resp: Resp<User> = req.call().into_json_deserialize()?;
+        Ok(resp.data.into_iter().map(|u| (u.id, u.login)).collect())
+    }
+
+    for streams in streams.chunks_mut(100) {
+        for (k, v) in get_usernames(&agent, streams.iter_mut().map(|(_, u)| &u.user_id))? {
+            if let Some((_, stream)) = streams.iter_mut().find(|(_, s)| s.user_id == k) {
+                stream.user_name = v;
+            }
+        }
+    }
 
     Ok(streams)
 }
