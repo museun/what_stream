@@ -5,7 +5,7 @@ use crate::{
     SCIENCE_AND_TECH_CATEGORY, WHAT_STREAM_CLIENT_ID,
 };
 
-#[derive(serde::Deserialize, serde::Serialize)]
+#[derive(Debug, serde::Deserialize, serde::Serialize)]
 pub struct Stream {
     pub started_at: String,
     pub title: String,
@@ -104,9 +104,11 @@ fn fetch_streams_inner<'a>(
         .into_json()
         .ok()?;
 
-    resp.data.is_empty().then(|| ())?;
-    *cursor = resp.pagination.cursor;
-    Some(resp.data)
+    if !resp.data.is_empty() {
+        *cursor = resp.pagination.cursor;
+        return Some(resp.data);
+    }
+    None
 }
 
 fn iterater_and_filter<'a>(

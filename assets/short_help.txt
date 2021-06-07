@@ -2,8 +2,9 @@ USAGE:
     what_stream [flags] [query ..]
 
 FLAGS:
-    -h, --help              show the help message
-    -v, --version           show the current version
-    -s, --sort <col,dir?>  sort by <col> in the optional <dir>
-    -t, --style <style>     what type of rendering style to use
-    -j, --json              dumps the results as json
+    -h, --help                 show the help message
+    -v, --version              show the current version
+    -l, --language <language>  filter to this specific language
+    -s, --sort <col,dir?>      sort by <col> in the optional <dir>
+    -t, --style <style>        what type of rendering style to use
+    -j, --json                 dumps the results as json

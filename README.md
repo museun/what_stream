@@ -8,42 +8,58 @@ e.g. `"c++ rust gamedev"`
 
 the `query` will match words in the stream title. the query is case-insensitive. so `opengl` will match `OpenGL`
 
+to filter for a spoken language, use the `-l`,`--language` flag. this can be used in succession.
+
+the format for these language filters are [`ISO-639-1`](https://en.wikipedia.org/wiki/List_of_ISO_639-1_codes). e.g. 'en' or 'de'
+
 ## requirements
 
-you must set `WHAT_STREAM_CLIENT_ID` and `WHAT_STREAM_BEARER_OAUTH` to their appropriate values.
+the following environment variables must be set while building:
 
-**note** the `BEARER_OAUTH` should just be the token, not the full `OAuth hexstring`
+`WHAT_STREAM_CLIENT_ID`
 
-you can get these from the Twitch developer console (_hint_ or your browser if you know where to look)
+- this your Twitch API Client-ID
+
+`WHAT_STREAM_CLIENT_SECRET`
+
+- this your Twitch API client secret
+
+### how to get these tokens, a primer
+
+1. to get these tokens, visit [https://dev.twitch.tv/console](https://dev.twitch.tv/console)
+1. then go to `applications`
+1. then `register your application`
+   1. enter a name
+   1. the redirect url can be `http://localhost`
+   1. category can be anything, but you should probably just choose `Analytics Tool`
+1. set the env var `WHAT_STREAM_CLIENT_ID` to the value of `Client ID`
+1. create a new secret by clicking `New Secret`
+   1. set the env var `WHAT_STREAM_CLIENT_SECRET` to that value
 
 ## example
 
 this'll look for streams with `c++` or `python` or `rust` in their title.
 
-`> what_stream c++ python rust`
+`> what_stream rust c# go`
 
 ```
-┌── python
-├ https://twitch.tv/Pydathon
-├ Python, scraping et data analyse :) !discord
-├ started 1 hours 21 minutes ago, 3 watching
-│
-├ https://twitch.tv/beginbot
-├ Vim Day! + [Go, Python, Linux] !me AMA
-└ started 1 hours 0 minutes ago, 53 watching
-
 ┌── rust
-├ https://twitch.tv/museun
+├ [EN] https://twitch.tv/museun
 ├ random projects in Rust
-├ started 2 hours 1 minutes ago, 2 watching
+└ started 1 hour 10 minutes ago, 9 watching
+
+┌── c#
+├ [PL] https://twitch.tv/mr_komugiko
+├ Pisanie prostej gierki ;d / MMO / C# / Unity
+├ started 35 minutes ago, 1 watching
 │
-├ https://twitch.tv/Brookzerker
-├ Building a Pitfall clone in Rust + GGEZ
-├ started 1 hours 22 minutes ago, 4 watching
+├ [EN] https://twitch.tv/x_coding
+├ Playing with some C#. Bug fixes, git and so on - !help
+├ started 2 hours 3 minutes ago, 5 watching
 │
-├ https://twitch.tv/togglebit
-├ Rust, Rantings and Ramblings: Friday fun! (whatever that means)
-└ started 8 hours 38 minutes ago, 53 watching
+├ [EN] https://twitch.tv/oxcanteven
+├ Twitch Audio Channel Point Redemptions | C#, .Net Core, Avalonia
+└ started 3 hours 18 minutes ago, 7 watching
 ```
 
 **note** if a query does not match, it will not be displayed.
@@ -53,17 +69,18 @@ also, try using one of the `--style` options
 ## usage
 
 ```
-what_stream 0.2.4
+what_stream 0.3.0
 
 USAGE:
     what_stream [flags] [query ..]
 
 FLAGS:
-    -h, --help              show the help message
-    -v, --version           show the current version
-    -s, --sort <col,dir?>  sort by <col> in the optional <dir>
-    -t, --style <style>     what type of rendering style to use
-    -j, --json              dumps the results as json
+    -h, --help                 show the help message
+    -v, --version              show the current version
+    -l, --language <language>  filter to this specific language
+    -s, --sort <col,dir?>      sort by <col> in the optional <dir>
+    -t, --style <style>        what type of rendering style to use
+    -j, --json                 dumps the results as json
 
 SORTING:
     available columns:
@@ -89,14 +106,10 @@ STYLES:
     - none
 
 NOTES:
-    if NO_COLORS is set, the colors are disabled
+    the --language flag can be used multiple times. e.g. `-l en -l pt -l de`
+    - a language value is in the form of `ISO 639-1`
 
-    the following environment variables must be set:
-    WHAT_STREAM_CLIENT_ID
-    - this your Twitch api Client-ID
-
-    WHAT_STREAM_BEARER_OAUTH
-    - this is an associated bearer OAuth from the Client-ID
+    if `NO_COLORS` is set, the colors are disabled
 ```
 
 ## license
