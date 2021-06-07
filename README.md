@@ -38,7 +38,7 @@ the following environment variables must be set while building:
 
 ## example
 
-this'll look for streams with `c++` or `python` or `rust` in their title.
+this'll look for streams with `rust` or `c#` or `go` in their title.
 
 `> what_stream rust c# go`
 
@@ -64,12 +64,10 @@ this'll look for streams with `c++` or `python` or `rust` in their title.
 
 **note** if a query does not match, it will not be displayed.
 
-also, try using one of the `--style` options
-
 ## usage
 
 ```
-what_stream 0.3.0
+what_stream 0.4.0
 
 USAGE:
     what_stream [flags] [query ..]
@@ -79,8 +77,9 @@ FLAGS:
     -v, --version              show the current version
     -l, --language <language>  filter to this specific language
     -s, --sort <col,dir?>      sort by <col> in the optional <dir>
-    -t, --style <style>        what type of rendering style to use
     -j, --json                 dumps the results as json
+    --print-default-config     print the default toml configuration
+    --print-config-path        print the default configuration path
 
 SORTING:
     available columns:
@@ -99,11 +98,6 @@ QUERY:
     query is a space separated list of 'tags' to filter by.
     the tags are case-insensitive and will match 'words' in the stream title
     e.g. 'opengl' will match 'OpenGL' in a title: "making a game with OpenGL"
-
-STYLES:
-    - box (the default)
-    - fancy
-    - none
 
 NOTES:
     the --language flag can be used multiple times. e.g. `-l en -l pt -l de`

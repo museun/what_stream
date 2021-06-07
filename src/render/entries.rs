@@ -17,7 +17,7 @@ impl<'a> Render for Entries<'a> {
             writer,
             "{left}{category}",
             category = theme.category.paint(&self.category),
-            left = theme.fringe.paint(style.top)
+            left = theme.fringe.paint(&*style.top)
         )?;
 
         let title_left_len = style.title.len();
@@ -25,7 +25,7 @@ impl<'a> Render for Entries<'a> {
         let max_width = super::width() - title_left_len;
         for (n, stream) in self.streams.iter().enumerate() {
             if n > 0 {
-                writeln!(writer, "{}", theme.entry.paint(&style.entry_sep))?;
+                writeln!(writer, "{}", theme.entry.paint(&*style.entry_sep))?;
             }
 
             writeln!(
@@ -33,10 +33,10 @@ impl<'a> Render for Entries<'a> {
                 "{left}[{language}] https://twitch.tv/{link}",
                 language = stream.language.to_ascii_uppercase(),
                 link = theme.link.paint(&stream.user_name),
-                left = theme.fringe.paint(&style.link),
+                left = theme.fringe.paint(&*style.link),
             )?;
 
-            write!(writer, "{left}", left = theme.fringe.paint(style.title))?;
+            write!(writer, "{left}", left = theme.fringe.paint(&*style.title))?;
 
             // if the title would wrap, partition it. but only if we're printing a left fringe
             if stream.title.width() > max_width && !style.title.is_empty() {
@@ -51,7 +51,7 @@ impl<'a> Render for Entries<'a> {
                                 writer,
                                 "\n{left}{sp: >title_left_len$}{word}",
                                 word = theme.title.paint(word.trim_start()),
-                                left = theme.fringe.paint(style.continuation),
+                                left = theme.fringe.paint(&*style.continuation),
                                 title_left_len = title_left_len - style.title.len(),
                                 sp = ""
                             )?;
@@ -70,9 +70,9 @@ impl<'a> Render for Entries<'a> {
                 uptime = theme.uptime.paint(&stream.started_at),
                 viewers = theme.viewers.paint(&stream.viewer_count),
                 left = theme.fringe.paint(if n < self.streams.len() - 1 {
-                    style.stats
+                    &*style.stats
                 } else {
-                    style.end
+                    &*style.end
                 })
             )?;
         }

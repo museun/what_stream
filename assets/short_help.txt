@@ -6,5 +6,6 @@ FLAGS:
     -v, --version              show the current version
     -l, --language <language>  filter to this specific language
     -s, --sort <col,dir?>      sort by <col> in the optional <dir>
-    -t, --style <style>        what type of rendering style to use
     -j, --json                 dumps the results as json
+    --print-default-config     print the default toml configuration
+    --print-config-path        print the default configuration path

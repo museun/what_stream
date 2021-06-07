@@ -1,6 +1,6 @@
 use anyhow::Context as _;
 
-use crate::{render::Style, WHAT_STREAM_CLIENT_ID, WHAT_STREAM_CLIENT_SECRET};
+use crate::{WHAT_STREAM_CLIENT_ID, WHAT_STREAM_CLIENT_SECRET};
 
 #[derive(Debug)]
 pub struct Args {
@@ -8,7 +8,6 @@ pub struct Args {
     pub query: Vec<String>,
     pub languages: Vec<String>,
     pub json: bool,
-    pub style: Style,
 }
 
 impl Args {
@@ -19,26 +18,34 @@ impl Args {
             Self::print_short_help();
             std::process::exit(0);
         }
+
         if args.contains("--help") {
             Self::print_long_help();
             std::process::exit(0);
         }
+
         if args.contains(["-v", "--version"]) {
             Self::print_version();
             std::process::exit(0);
         }
 
+        if args.contains("--print-default-config") {
+            println!("{}", crate::Config::default_formatted_toml());
+            std::process::exit(0)
+        }
+
+        if args.contains("--print-config-path") {
+            println!(
+                "{}",
+                crate::Config::get_config_path()
+                    .with_context(|| "your system does not have a configuration directory")?
+                    .to_string_lossy()
+            );
+            std::process::exit(0)
+        }
+
         let json = args.contains(["-j", "--json"]);
         let sort = args.opt_value_from_str(["-s", "--sort"])?;
-
-        let style = args
-            .opt_value_from_fn(["-t", "--style"], |s| match s {
-                "fancy" => Ok(Style::FANCY),
-                "box" => Ok(Style::BOX),
-                "none" => Ok(Style::NONE),
-                s => anyhow::bail!("unknown style: {}", s),
-            })?
-            .unwrap_or(Style::BOX);
 
         let languages: Vec<String> = args.values_from_str(["-l", "--language"])?;
 
@@ -46,14 +53,13 @@ impl Args {
             .finish()
             .into_iter()
             .map(|s| s.to_string_lossy().to_string())
-            .collect();
+            .collect::<Vec<_>>();
 
         Ok(Self {
             sort,
             query,
             languages,
             json,
-            style,
         })
     }
 
@@ -128,13 +134,12 @@ pub struct AppAccess {
 
 impl AppAccess {
     pub fn get() -> anyhow::Result<Self> {
-        let resp = ureq::post("https://id.twitch.tv/oauth2/token")
+        ureq::post("https://id.twitch.tv/oauth2/token")
             .query("client_id", WHAT_STREAM_CLIENT_ID)
             .query("client_secret", WHAT_STREAM_CLIENT_SECRET)
             .query("grant_type", "client_credentials")
-            .call()?;
-
-        let access = resp.into_json::<AppAccess>()?;
-        Ok(access)
+            .call()?
+            .into_json()
+            .map_err(Into::into)
     }
 }

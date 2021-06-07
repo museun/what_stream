@@ -1,5 +1,11 @@
 use std::io::Write;
 
+mod color;
+pub use color::{Color, ColorStyle};
+
+mod config;
+pub use config::{Appearance, Config, Parameters};
+
 mod theme;
 pub use theme::Theme;
 

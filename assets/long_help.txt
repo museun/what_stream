@@ -16,11 +16,6 @@ QUERY:
     the tags are case-insensitive and will match 'words' in the stream title
     e.g. 'opengl' will match 'OpenGL' in a title: "making a game with OpenGL"
 
-STYLES:
-    - box (the default)
-    - fancy
-    - none
-
 NOTES:
     the --language flag can be used multiple times. e.g. `-l en -l pt -l de`
     - a language value is in the form of `ISO 639-1`

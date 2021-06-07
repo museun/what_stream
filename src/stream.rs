@@ -70,12 +70,12 @@ pub fn sort_streams(streams: &mut Vec<Stream>, option: Option<SortAction>) {
             .unwrap_or_else(|| left.viewer_count.cmp(&right.viewer_count))
     });
 
-    // XXX: shouldn't we want to de-dupe first?
+    // XXX: shouldn't we want to de-dup first?
     // sometimes the api hiccups -- this'll ensure we'll just get uniques
     streams.dedup_by(|a, b| a.user_name == b.user_name);
 }
 
-fn fetch_streams_inner<'a>(
+fn fetch_streams_inner(
     agent: &ureq::Agent,
     token: &str,
     cursor: &mut String,
@@ -96,7 +96,7 @@ fn fetch_streams_inner<'a>(
         .get("https://api.twitch.tv/helix/streams")
         .query("game_id", SCIENCE_AND_TECH_CATEGORY)
         .query("first", "100")
-        .query("after", &cursor)
+        .query("after", cursor)
         .set("client-id", WHAT_STREAM_CLIENT_ID)
         .set("authorization", token)
         .call()
@@ -171,7 +171,7 @@ where
             |req, (k, v)| req.query(k, v),
         )
         .set("client-id", WHAT_STREAM_CLIENT_ID)
-        .set("authorization", &token)
+        .set("authorization", token)
         .call()?
         .into_json::<Resp<User>>()?
         .data

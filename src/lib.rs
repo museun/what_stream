@@ -13,7 +13,7 @@ mod args;
 pub use args::{AppAccess, Args};
 
 mod render;
-pub use render::{Entries, Render, Style, Theme};
+pub use render::{Appearance, Config, Entries, Parameters, Render, Style, Theme};
 
 mod stream;
 pub use stream::{fetch_streams, sort_streams, Stream};
