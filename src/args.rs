@@ -39,7 +39,11 @@ impl Args {
             })?
             .unwrap_or(Style::BOX);
 
-        let query = args.free()?;
+        let query = args
+            .finish()
+            .into_iter()
+            .map(|s| s.to_string_lossy().to_string())
+            .collect();
         Ok(Self {
             sort,
             query,

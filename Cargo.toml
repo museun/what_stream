@@ -1,18 +1,18 @@
 [package]
-name    = "what_stream"
-version = "0.2.5"
-authors = ["museun <museun@outlook.com>"]
-edition = "2018"
-license = "0BSD"
+name                 = "what_stream"
+version              = "0.2.5"
+authors              = ["museun <museun@outlook.com>"]
+edition              = "2018"
+license              = "0BSD"
 
 [dependencies]
-anyhow               = "1.0.34"
+anyhow               = "1.0.40"
 chrono               = { version = "0.4.19", default-features = false, features = ["clock"] }
-pico-args            = "0.3.4"
-serde                = { version = "1.0.117", features = ["derive"] }
-serde_json           = "1.0.59"
-terminal_size        = "0.1.15"
-unicode-segmentation = "1.7.0"
+pico-args            = "0.4.2"
+serde                = { version = "1.0.126", features = ["derive"] }
+serde_json           = "1.0.64"
+terminal_size        = "0.1.17"
+unicode-segmentation = "1.7.1"
 unicode-width        = "0.1.8"
-ureq                 = { version = "1.5.2", default-features = false, features = ["json", "tls"] } #native-tls
+ureq                 = { version = "2.1.1", default-features = false, features = ["json", "tls"] } #native-tls
 yansi                = "0.5.0"

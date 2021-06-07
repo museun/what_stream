@@ -14,12 +14,15 @@ fn try_enable_colors() {
     }
 }
 
-fn render_streams<'a>(
+fn render_streams<'a, I>(
     out: &mut dyn Write,
     style: &Style,
     theme: &Theme,
-    streams: impl IntoIterator<Item = (String, &'a [Stream])>,
-) -> anyhow::Result<()> {
+    streams: I,
+) -> anyhow::Result<()>
+where
+    I: IntoIterator<Item = (String, &'a [Stream])>,
+{
     streams
         .into_iter()
         .enumerate()
@@ -36,7 +39,8 @@ fn render_streams<'a>(
 }
 
 fn main() -> anyhow::Result<()> {
-    let secrets = Secrets::get()?;
+    let secrets = Secrets::get()?; // TODO maybe do an oauth token flow if we cannot get the secrets
+
     let args = Args::parse()?;
 
     if args.query.is_empty() {

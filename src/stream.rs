@@ -36,10 +36,8 @@ pub fn fetch_streams<'a>(
         cursor: String,
     }
 
-    let agent = ureq::agent()
-        .set("client-id", client_id)
-        .auth_kind("Bearer", bearer_oauth)
-        .build();
+    let agent = ureq::agent();
+    let token = format!("Bearer {}", bearer_oauth);
 
     let mut cursor = String::new();
     let mut streams = std::iter::from_fn(|| {
@@ -51,8 +49,11 @@ pub fn fetch_streams<'a>(
             .query("game_id", SCIENCE_AND_TECH)
             .query("first", "100")
             .query("after", &cursor)
+            .set("client-id", client_id)
+            .set("authorization", &token)
             .call()
-            .into_json_deserialize()
+            .ok()?
+            .into_json()
             .ok()?;
 
         match resp.data.is_empty() {
@@ -90,6 +91,7 @@ pub fn fetch_streams<'a>(
                 .unwrap();
 
         // TODO do this do differently
+        // TODO why?
         let seconds = duration.num_seconds();
         let hours = (seconds / 60) / 60;
         let minutes = (seconds / 60) % 60;
@@ -114,10 +116,15 @@ pub fn fetch_streams<'a>(
         stream.started_at = started;
     });
 
-    fn get_usernames<'b: 'a, 'a>(
+    fn get_usernames<'b: 'a, 'a, I>(
         agent: &ureq::Agent,
-        ids: impl Iterator<Item = &'b String> + 'a,
-    ) -> anyhow::Result<HashMap<String, String>> {
+        ids: I,
+        client_id: &str,
+        token: &str,
+    ) -> anyhow::Result<HashMap<String, String>>
+    where
+        I: Iterator<Item = &'b String> + 'a,
+    {
         #[derive(serde::Deserialize)]
         struct Resp<T> {
             data: Vec<T>,
@@ -129,16 +136,23 @@ pub fn fetch_streams<'a>(
             login: String,
         }
 
-        let mut req = &mut agent.get("https://api.twitch.tv/helix/users");
+        let mut req = agent.get("https://api.twitch.tv/helix/users");
         for (k, v) in std::iter::repeat("id").zip(ids) {
             req = req.query(k, v);
         }
-        let resp: Resp<User> = req.call().into_json_deserialize()?;
+        req = req.set("client-id", client_id).set("authorization", &token);
+
+        let resp: Resp<User> = req.call()?.into_json()?;
         Ok(resp.data.into_iter().map(|u| (u.id, u.login)).collect())
     }
 
     for streams in streams.chunks_mut(100) {
-        for (k, v) in get_usernames(&agent, streams.iter_mut().map(|(_, u)| &u.user_id))? {
+        for (k, v) in get_usernames(
+            &agent,
+            streams.iter_mut().map(|(_, u)| &u.user_id),
+            &client_id,
+            &token,
+        )? {
             if let Some((_, stream)) = streams.iter_mut().find(|(_, s)| s.user_id == k) {
                 stream.user_name = v;
             }
