@@ -1,11 +1,12 @@
 use anyhow::Context as _;
 
-use crate::render::Style;
+use crate::{render::Style, WHAT_STREAM_CLIENT_ID, WHAT_STREAM_CLIENT_SECRET};
 
 #[derive(Debug)]
 pub struct Args {
     pub sort: Option<SortAction>,
     pub query: Vec<String>,
+    pub languages: Vec<String>,
     pub json: bool,
     pub style: Style,
 }
@@ -39,14 +40,18 @@ impl Args {
             })?
             .unwrap_or(Style::BOX);
 
+        let languages: Vec<String> = args.values_from_str(["-l", "--language"])?;
+
         let query = args
             .finish()
             .into_iter()
             .map(|s| s.to_string_lossy().to_string())
             .collect();
+
         Ok(Self {
             sort,
             query,
+            languages,
             json,
             style,
         })
@@ -65,29 +70,6 @@ impl Args {
 
     fn print_version() {
         println!("{} {}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"));
-    }
-}
-
-pub struct Secrets {
-    pub client_id: String,
-    pub bearer_oauth: String,
-}
-
-impl Secrets {
-    pub fn get() -> anyhow::Result<Self> {
-        let client_id = std::env::var("WHAT_STREAM_CLIENT_ID").unwrap_or_else(|_| {
-            eprintln!("please set 'WHAT_STREAM_CLIENT_ID' to your Twitch Client ID");
-            std::process::exit(1)
-        });
-        let bearer_oauth = std::env::var("WHAT_STREAM_BEARER_OAUTH").unwrap_or_else(|_| {
-            eprintln!("please set 'WHAT_STREAM_BEARER_OAUTH' to your Twitch Bearer OAuth token");
-            std::process::exit(1)
-        });
-
-        Ok(Self {
-            client_id,
-            bearer_oauth,
-        })
     }
 }
 
@@ -134,4 +116,25 @@ pub enum Column {
 pub enum Direction {
     Descending,
     Ascending,
+}
+
+#[derive(Debug, Clone, serde::Deserialize)]
+pub struct AppAccess {
+    pub access_token: String,
+    pub refresh_token: Option<String>,
+    pub expires_in: u64,
+    pub token_type: String,
+}
+
+impl AppAccess {
+    pub fn get() -> anyhow::Result<Self> {
+        let resp = ureq::post("https://id.twitch.tv/oauth2/token")
+            .query("client_id", WHAT_STREAM_CLIENT_ID)
+            .query("client_secret", WHAT_STREAM_CLIENT_SECRET)
+            .query("grant_type", "client_credentials")
+            .call()?;
+
+        let access = resp.into_json::<AppAccess>()?;
+        Ok(access)
+    }
 }

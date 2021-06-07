@@ -39,8 +39,6 @@ where
 }
 
 fn main() -> anyhow::Result<()> {
-    let secrets = Secrets::get()?; // TODO maybe do an oauth token flow if we cannot get the secrets
-
     let args = Args::parse()?;
 
     if args.query.is_empty() {
@@ -48,13 +46,14 @@ fn main() -> anyhow::Result<()> {
         std::process::exit(1)
     }
 
-    let mut streams = fetch_streams(&args.query, &secrets)?.into_iter().fold(
-        HashMap::<_, Vec<_>>::new(),
-        |mut map, (category, stream)| {
+    let app_access = AppAccess::get()?;
+
+    let mut streams: HashMap<_, Vec<_>> = fetch_streams(&args.query, &args.languages, &app_access)?
+        .into_iter()
+        .fold(Default::default(), |mut map, (category, stream)| {
             map.entry(category.clone()).or_default().push(stream);
             map
-        },
-    );
+        });
 
     if args.json {
         println!("{}", serde_json::to_string_pretty(&streams)?);

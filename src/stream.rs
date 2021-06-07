@@ -1,6 +1,9 @@
 use std::collections::HashMap;
 
-use crate::args::{Column, Direction, Secrets, SortAction};
+use crate::{
+    args::{AppAccess, Column, Direction, SortAction},
+    SCIENCE_AND_TECH_CATEGORY, WHAT_STREAM_CLIENT_ID,
+};
 
 #[derive(serde::Deserialize, serde::Serialize)]
 pub struct Stream {
@@ -9,8 +12,6 @@ pub struct Stream {
     pub user_name: String,
     pub user_id: String,
     pub viewer_count: i64,
-
-    #[allow(dead_code)]
     pub language: String,
 
     #[serde(skip)]
@@ -19,140 +20,26 @@ pub struct Stream {
 
 pub fn fetch_streams<'a>(
     query: &'a [String],
-    Secrets {
-        client_id,
-        bearer_oauth,
-    }: &Secrets,
+    languages: &[String],
+    app_access: &AppAccess,
 ) -> anyhow::Result<Vec<(&'a String, Stream)>> {
-    #[derive(serde::Deserialize)]
-    struct Resp<T> {
-        data: Vec<T>,
-        pagination: Pagination,
-    }
-
-    #[derive(Default, serde::Deserialize)]
-    struct Pagination {
-        #[serde(default)]
-        cursor: String,
-    }
-
     let agent = ureq::agent();
-    let token = format!("Bearer {}", bearer_oauth);
+    let token = format!("Bearer {}", app_access.access_token);
 
-    let mut cursor = String::new();
-    let mut streams = std::iter::from_fn(|| {
-        // XXX this is hardcoded (for 'science and technology')
-        const SCIENCE_AND_TECH: &str = "509670";
+    let mut streams = iterater_and_filter(&agent, query, languages, &token);
 
-        let resp: Resp<Stream> = agent
-            .get("https://api.twitch.tv/helix/streams")
-            .query("game_id", SCIENCE_AND_TECH)
-            .query("first", "100")
-            .query("after", &cursor)
-            .set("client-id", client_id)
-            .set("authorization", &token)
-            .call()
-            .ok()?
-            .into_json()
-            .ok()?;
-
-        match resp.data.is_empty() {
-            true => None,
-            false => {
-                cursor = resp.pagination.cursor;
-                Some(resp.data)
-            }
-        }
-    })
-    .flatten()
-    .filter_map(|stream| {
-        for part in stream
-            .title
-            .split(' ')
-            .map(trim_word_boundaries)
-            .filter(|s| !s.is_empty())
-            .map(|s| s.to_lowercase())
-        {
-            for q in query {
-                if *q == part {
-                    return Some((q, stream));
-                }
-            }
-        }
-        None
-    })
-    .collect::<Vec<_>>();
-
-    streams.iter_mut().for_each(|(_, stream)| {
-        let duration: chrono::Duration = chrono::Utc::now()
-            - stream
-                .started_at
-                .parse::<chrono::DateTime<chrono::Utc>>()
-                .unwrap();
-
-        // TODO do this do differently
-        // TODO why?
-        let seconds = duration.num_seconds();
-        let hours = (seconds / 60) / 60;
-        let minutes = (seconds / 60) % 60;
-
-        let started = if hours > 0 {
-            format!(
-                "{hours} hour{h_plural} {minutes} minute{m_plural}",
-                hours = hours,
-                minutes = minutes,
-                h_plural = if hours > 1 { "s" } else { "" },
-                m_plural = if minutes > 1 { "s" } else { "" },
-            )
-        } else {
-            format!(
-                "{minutes} minute{m_plural}",
-                minutes = minutes,
-                m_plural = if minutes > 1 { "s" } else { "" }
-            )
-        };
-
+    // fix up the time
+    for (_, stream) in &mut streams {
+        let (seconds, started_at) = format_time(&stream.started_at);
         stream.uptime = seconds;
-        stream.started_at = started;
-    });
-
-    fn get_usernames<'b: 'a, 'a, I>(
-        agent: &ureq::Agent,
-        ids: I,
-        client_id: &str,
-        token: &str,
-    ) -> anyhow::Result<HashMap<String, String>>
-    where
-        I: Iterator<Item = &'b String> + 'a,
-    {
-        #[derive(serde::Deserialize)]
-        struct Resp<T> {
-            data: Vec<T>,
-        }
-
-        #[derive(serde::Deserialize)]
-        struct User {
-            id: String,
-            login: String,
-        }
-
-        let mut req = agent.get("https://api.twitch.tv/helix/users");
-        for (k, v) in std::iter::repeat("id").zip(ids) {
-            req = req.query(k, v);
-        }
-        req = req.set("client-id", client_id).set("authorization", &token);
-
-        let resp: Resp<User> = req.call()?.into_json()?;
-        Ok(resp.data.into_iter().map(|u| (u.id, u.login)).collect())
+        stream.started_at = started_at;
     }
 
+    // then fetch usernames for each userid
     for streams in streams.chunks_mut(100) {
-        for (k, v) in get_usernames(
-            &agent,
-            streams.iter_mut().map(|(_, u)| &u.user_id),
-            &client_id,
-            &token,
-        )? {
+        let user_ids = streams.iter_mut().map(|(_, u)| &u.user_id);
+        for (k, v) in get_usernames(&agent, user_ids, &token)? {
+            // this is sorta quadratic
             if let Some((_, stream)) = streams.iter_mut().find(|(_, s)| s.user_id == k) {
                 stream.user_name = v;
             }
@@ -183,8 +70,143 @@ pub fn sort_streams(streams: &mut Vec<Stream>, option: Option<SortAction>) {
             .unwrap_or_else(|| left.viewer_count.cmp(&right.viewer_count))
     });
 
+    // XXX: shouldn't we want to de-dupe first?
     // sometimes the api hiccups -- this'll ensure we'll just get uniques
     streams.dedup_by(|a, b| a.user_name == b.user_name);
+}
+
+fn fetch_streams_inner<'a>(
+    agent: &ureq::Agent,
+    token: &str,
+    cursor: &mut String,
+) -> Option<Vec<Stream>> {
+    #[derive(serde::Deserialize)]
+    struct Resp<T> {
+        data: Vec<T>,
+        pagination: Pagination,
+    }
+
+    #[derive(Default, serde::Deserialize)]
+    struct Pagination {
+        #[serde(default)]
+        cursor: String,
+    }
+
+    let resp: Resp<Stream> = agent
+        .get("https://api.twitch.tv/helix/streams")
+        .query("game_id", SCIENCE_AND_TECH_CATEGORY)
+        .query("first", "100")
+        .query("after", &cursor)
+        .set("client-id", WHAT_STREAM_CLIENT_ID)
+        .set("authorization", token)
+        .call()
+        .ok()?
+        .into_json()
+        .ok()?;
+
+    resp.data.is_empty().then(|| ())?;
+    *cursor = resp.pagination.cursor;
+    Some(resp.data)
+}
+
+fn iterater_and_filter<'a>(
+    agent: &ureq::Agent,
+    query: &'a [String],
+    languages: &[String],
+    token: &str,
+) -> Vec<(&'a String, Stream)> {
+    let mut cursor = String::new();
+    std::iter::from_fn(|| fetch_streams_inner(agent, token, &mut cursor))
+        .flatten()
+        .filter(|stream| {
+            languages.is_empty()
+                || languages
+                    .iter()
+                    .any(|s| s.eq_ignore_ascii_case(&stream.language))
+        })
+        .filter_map(|stream| {
+            for part in stream
+                .title
+                .split(' ')
+                .map(trim_word_boundaries)
+                .filter(|s| !s.is_empty())
+                .map(|s| s.to_lowercase())
+            {
+                for q in query {
+                    if *q == part {
+                        return Some((q, stream));
+                    }
+                }
+            }
+            None
+        })
+        .collect()
+}
+
+fn get_usernames<'b: 'a, 'a, I>(
+    agent: &ureq::Agent,
+    ids: I,
+    token: &str,
+) -> anyhow::Result<HashMap<String, String>>
+where
+    I: Iterator<Item = &'b String> + 'a,
+{
+    #[derive(serde::Deserialize)]
+    struct Resp<T> {
+        data: Vec<T>,
+    }
+
+    #[derive(serde::Deserialize)]
+    struct User {
+        id: String,
+        login: String,
+    }
+
+    std::iter::repeat("id")
+        .zip(ids)
+        .fold(
+            agent.get("https://api.twitch.tv/helix/users"),
+            |req, (k, v)| req.query(k, v),
+        )
+        .set("client-id", WHAT_STREAM_CLIENT_ID)
+        .set("authorization", &token)
+        .call()?
+        .into_json::<Resp<User>>()?
+        .data
+        .into_iter()
+        .map(|u| (u.id, u.login))
+        .map(Ok)
+        .collect()
+}
+
+fn format_time(started_at: &str) -> (i64, String) {
+    use chrono::*;
+    let duration: Duration = Utc::now()
+        - started_at
+            .parse::<DateTime<Utc>>()
+            .expect("valid timestamp");
+
+    let seconds = duration.num_seconds();
+    let hours = (seconds / 60) / 60;
+    let minutes = (seconds / 60) % 60;
+
+    let started = if hours > 0 {
+        format!(
+            "{hours} hour{h_plural} {minutes} minute{m_plural}",
+            hours = hours,
+            minutes = minutes,
+            h_plural = if hours > 1 { "s" } else { "" },
+            m_plural = if minutes > 1 { "s" } else { "" },
+        )
+    } else {
+        format!(
+            "{minutes} minute{m_plural}",
+            minutes = minutes,
+            m_plural = if minutes > 1 { "s" } else { "" }
+        )
+    };
+
+    (seconds, started)
 }
 
 fn trim_word_boundaries(s: &str) -> &str {

@@ -14,8 +14,8 @@ pub struct Theme {
 impl Theme {
     pub fn standard() -> Self {
         Self {
-            fringe: Style::new(Color::Black).bold(),
-            entry: Style::new(Color::Black).bold(),
+            fringe: Style::new(Color::RGB(128, 128, 128)).bold(), // TODO don't use black
+            entry: Style::new(Color::RGB(96, 96, 96)).bold(),     // TODO don't use black
 
             category: Style::new(Color::Magenta),
             link: Style::new(Color::Blue).bold(),
