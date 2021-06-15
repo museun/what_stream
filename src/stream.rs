@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{borrow::Cow, collections::HashMap};
 
 use crate::{
     args::{AppAccess, Column, Direction, SortAction},
@@ -7,12 +7,12 @@ use crate::{
 
 #[derive(Debug, serde::Deserialize, serde::Serialize)]
 pub struct Stream {
-    pub started_at: String,
-    pub title: String,
-    pub user_name: String,
-    pub user_id: String,
+    pub started_at: Cow<'static, str>,
+    pub title: Cow<'static, str>,
+    pub user_name: Cow<'static, str>,
+    pub user_id: Cow<'static, str>,
     pub viewer_count: i64,
-    pub language: String,
+    pub language: Cow<'static, str>,
 
     #[serde(skip)]
     pub uptime: i64,
@@ -32,16 +32,19 @@ pub fn fetch_streams<'a>(
     for (_, stream) in &mut streams {
         let (seconds, started_at) = format_time(&stream.started_at);
         stream.uptime = seconds;
-        stream.started_at = started_at;
+        stream.started_at = started_at.into();
     }
 
     // then fetch usernames for each userid
     for streams in streams.chunks_mut(100) {
-        let user_ids = streams.iter_mut().map(|(_, u)| &u.user_id);
+        let user_ids = streams.iter_mut().map(|(_, u)| match u.user_id {
+            Cow::Borrowed(_) => todo!(),
+            Cow::Owned(ref s) => s,
+        });
         for (k, v) in get_usernames(&agent, user_ids, &token)? {
             // this is sorta quadratic
             if let Some((_, stream)) = streams.iter_mut().find(|(_, s)| s.user_id == k) {
-                stream.user_name = v;
+                stream.user_name = v.into();
             }
         }
     }

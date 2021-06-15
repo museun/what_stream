@@ -15,6 +15,9 @@ pub use style::Style;
 mod entries;
 pub use entries::Entries;
 
+mod demo;
+pub use demo::Demo;
+
 pub trait Render {
     fn render(&self, writer: &mut dyn Write, style: &Style, theme: &Theme) -> anyhow::Result<()>;
 }

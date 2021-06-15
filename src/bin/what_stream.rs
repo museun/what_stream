@@ -44,6 +44,16 @@ fn append_maybe(left: &mut Vec<String>, right: &[String]) {
     left.retain(|s| !s.is_empty());
 }
 
+fn show_demo(config: &Config) -> anyhow::Result<()> {
+    try_enable_colors();
+    let out = std::io::stdout();
+    let mut out = out.lock();
+
+    let Appearance { glyphs, colors } = &config.appearance;
+    what_stream::Demo::show_off(&mut out, glyphs, colors)?;
+    Ok(())
+}
+
 fn main() -> anyhow::Result<()> {
     let mut args = Args::parse()?;
     let config: Config = Config::get_config_path()
@@ -54,6 +64,11 @@ fn main() -> anyhow::Result<()> {
 
     append_maybe(&mut args.languages, &*config.parameters.languages);
     append_maybe(&mut args.query, &*config.parameters.query);
+
+    if args.demo {
+        show_demo(&config)?;
+        std::process::exit(0);
+    }
 
     if args.query.is_empty() {
         eprintln!("please provide something to filter by");

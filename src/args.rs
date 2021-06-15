@@ -8,6 +8,7 @@ pub struct Args {
     pub query: Vec<String>,
     pub languages: Vec<String>,
     pub json: bool,
+    pub demo: bool,
 }
 
 impl Args {
@@ -44,6 +45,8 @@ impl Args {
             std::process::exit(0)
         }
 
+        let demo = args.contains("--demo");
+
         let json = args.contains(["-j", "--json"]);
         let sort = args.opt_value_from_str(["-s", "--sort"])?;
 
@@ -60,6 +63,7 @@ impl Args {
             query,
             languages,
             json,
+            demo,
         })
     }
 
