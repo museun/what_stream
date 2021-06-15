@@ -33,13 +33,14 @@ stats        = "├ "
 # default: { fg: "#C0C0C0", bg: <unset>, bold: false }
 
 # TODO explain these
-fringe       = { fg = "#808080", bold = true }
-entry        = { fg = "#606060", bold = true }
-category     = { fg = "#881798" }
-link         = { fg = "#3B78FF", bold = true }
-title        = { fg = "#C19C00", bold = true }
-uptime       = { fg = "#13A10E" }
-viewers      = { fg = "#3A96DD" }
+fringe          = { fg = "#808080", bold = true }
+entry           = { fg = "#606060", bold = true }
+category        = { fg = "#881798" }
+spoken_language = { fg = "#FFFFFF" }
+link            = { fg = "#3B78FF", bold = true }
+title           = { fg = "#C19C00", bold = true }
+uptime          = { fg = "#13A10E" }
+viewers         = { fg = "#3A96DD" }
 "##
     }
 }

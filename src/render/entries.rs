@@ -31,7 +31,9 @@ impl<'a> Render for Entries<'a> {
             writeln!(
                 writer,
                 "{left}[{language}] https://twitch.tv/{link}",
-                language = stream.language.to_ascii_uppercase(),
+                language = theme
+                    .spoken_language
+                    .paint(&stream.language.to_ascii_uppercase()),
                 link = theme.link.paint(&stream.user_name),
                 left = theme.fringe.paint(&*style.link),
             )?;

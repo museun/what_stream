@@ -6,6 +6,7 @@ pub struct Theme {
     pub entry: ColorStyle,
 
     pub category: ColorStyle,
+    pub spoken_language: ColorStyle,
     pub link: ColorStyle,
     pub title: ColorStyle,
     pub uptime: ColorStyle,
@@ -19,6 +20,7 @@ impl Theme {
             entry: ColorStyle::new(Color(96, 96, 96)).bold(),
 
             category: ColorStyle::new(Color::MAGENTA),
+            spoken_language: ColorStyle::new(Color::BRIGHT_WHITE),
             link: ColorStyle::new(Color::BRIGHT_BLUE).bold(),
             title: ColorStyle::new(Color::YELLOW).bold(),
             uptime: ColorStyle::new(Color::GREEN),
