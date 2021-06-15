@@ -51,6 +51,11 @@ pub fn fetch_streams<'a>(
 
 pub fn sort_streams(streams: &mut Vec<Stream>, option: Option<SortAction>) {
     use {Column::*, Direction::*};
+
+    // sometimes the api hiccups -- this'll ensure we'll just get uniques
+    streams.sort_unstable_by(|a, b| a.user_id.cmp(&b.user_id));
+    streams.dedup_by(|a, b| a.user_id == b.user_id);
+
     streams.sort_unstable_by(|left, right| {
         option
             .map(|sort| {
@@ -69,10 +74,6 @@ pub fn sort_streams(streams: &mut Vec<Stream>, option: Option<SortAction>) {
             })
             .unwrap_or_else(|| left.viewer_count.cmp(&right.viewer_count))
     });
-
-    // XXX: shouldn't we want to de-dup first?
-    // sometimes the api hiccups -- this'll ensure we'll just get uniques
-    streams.dedup_by(|a, b| a.user_name == b.user_name);
 }
 
 fn fetch_streams_inner(
