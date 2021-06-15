@@ -78,6 +78,7 @@ FLAGS:
     -l, --language <language>  filter to this specific language
     -s, --sort <col,dir?>      sort by <col> in the optional <dir>
     -j, --json                 dumps the results as json
+    --demo                     renders a dummy response
     --print-default-config     print the default toml configuration
     --print-config-path        print the default configuration path
 
