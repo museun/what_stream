@@ -40,10 +40,11 @@ impl<'a> Render for Entries<'a> {
 
             write!(writer, "{left}", left = theme.fringe.paint(&*style.title))?;
 
+            let title = stream.title.trim();
+
             // if the title would wrap, partition it. but only if we're printing a left fringe
-            if stream.title.width() > max_width && !style.title.is_empty() {
-                for word in crate::string::partition_line(&*stream.title, max_width, title_left_len)
-                {
+            if title.width() > max_width && !style.title.is_empty() {
+                for word in crate::string::partition_line(&*title, max_width, title_left_len) {
                     match word {
                         crate::string::LinePartition::Continuation(word) => {
                             write!(writer, "{}", theme.title.paint(word))?
