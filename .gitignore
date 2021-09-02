@@ -3,3 +3,4 @@
 *.html
 *.json
 .env
+.env.ps1
