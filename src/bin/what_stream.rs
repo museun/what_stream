@@ -25,12 +25,12 @@ where
     streams
         .into_iter()
         .enumerate()
-        .try_for_each(|(n, (category, streams))| {
+        .try_for_each(|(n, (query, streams))| {
             if n > 0 {
                 writeln!(out)?;
             }
             Entries {
-                category: &category,
+                query: &query,
                 streams,
             }
             .render(out, glyphs, colors)

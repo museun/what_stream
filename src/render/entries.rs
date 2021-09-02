@@ -5,7 +5,7 @@ use crate::stream::Stream;
 use super::{Render, Style, Theme};
 
 pub struct Entries<'a> {
-    pub category: &'a str,
+    pub query: &'a str,
     pub streams: &'a [Stream],
 }
 
@@ -15,8 +15,8 @@ impl<'a> Render for Entries<'a> {
 
         writeln!(
             writer,
-            "{left}{category}",
-            category = theme.category.paint(&self.category),
+            "{left}{query}",
+            query = theme.category.paint(&self.query),
             left = theme.fringe.paint(&*style.top)
         )?;
 

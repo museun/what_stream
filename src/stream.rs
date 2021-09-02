@@ -14,6 +14,8 @@ pub struct Stream {
     pub viewer_count: i64,
     pub language: Cow<'static, str>,
 
+    pub tag_ids: Cow<'static, [Cow<'static, str>]>,
+
     #[serde(skip)]
     pub uptime: i64,
 }
@@ -26,7 +28,7 @@ pub fn fetch_streams<'a>(
     let agent = ureq::agent();
     let token = format!("Bearer {}", app_access.access_token);
 
-    let mut streams = iterater_and_filter(&agent, query, languages, &token);
+    let mut streams = iterate_and_filter(&agent, query, languages, &token);
 
     // fix up the time
     for (_, stream) in &mut streams {
@@ -96,7 +98,7 @@ fn fetch_streams_inner(
         cursor: String,
     }
 
-    let resp: Resp<Stream> = agent
+    let resp = agent
         .get("https://api.twitch.tv/helix/streams")
         .query("game_id", SCIENCE_AND_TECH_CATEGORY)
         .query("first", "100")
@@ -104,9 +106,9 @@ fn fetch_streams_inner(
         .set("client-id", WHAT_STREAM_CLIENT_ID)
         .set("authorization", token)
         .call()
-        .ok()?
-        .into_json()
         .ok()?;
+
+    let resp: Resp<Stream> = serde_json::from_reader(resp.into_reader()).ok()?;
 
     if !resp.data.is_empty() {
         *cursor = resp.pagination.cursor;
@@ -115,7 +117,7 @@ fn fetch_streams_inner(
     None
 }
 
-fn iterater_and_filter<'a>(
+fn iterate_and_filter<'a>(
     agent: &ureq::Agent,
     query: &'a [String],
     languages: &[String],
@@ -124,6 +126,8 @@ fn iterater_and_filter<'a>(
     let mut cursor = String::new();
     std::iter::from_fn(|| fetch_streams_inner(agent, token, &mut cursor))
         .flatten()
+        // TODO remove this
+        // .inspect(|s| eprintln!("({}) {}: {:?}", s.user_id, s.user_name, s.tag_ids))
         .filter(|stream| {
             languages.is_empty()
                 || languages
