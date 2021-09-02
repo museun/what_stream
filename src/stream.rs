@@ -127,8 +127,6 @@ fn iterate_and_filter<'a>(
     let mut cursor = String::new();
     std::iter::from_fn(|| fetch_streams_inner(agent, token, &mut cursor))
         .flatten()
-        // TODO remove this
-        // .inspect(|s| eprintln!("({}) {}: {:?}", s.user_id, s.user_name, s.tag_ids))
         .filter(|stream| {
             languages.is_empty()
                 || languages
