@@ -2,7 +2,7 @@ use std::{borrow::Cow, collections::HashMap};
 
 use crate::{
     args::{AppAccess, Column, Direction, SortAction},
-    SCIENCE_AND_TECH_CATEGORY, WHAT_STREAM_CLIENT_ID,
+    SCIENCE_AND_TECH_CATEGORY, SOFTWARE_AND_GAME_DEV_CATEGORY, WHAT_STREAM_CLIENT_ID,
 };
 
 #[derive(Debug, serde::Deserialize, serde::Serialize)]
@@ -101,6 +101,7 @@ fn fetch_streams_inner(
     let resp = agent
         .get("https://api.twitch.tv/helix/streams")
         .query("game_id", SCIENCE_AND_TECH_CATEGORY)
+        .query("game_id", SOFTWARE_AND_GAME_DEV_CATEGORY)
         .query("first", "100")
         .query("after", cursor)
         .set("client-id", WHAT_STREAM_CLIENT_ID)
