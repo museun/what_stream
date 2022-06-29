@@ -200,10 +200,10 @@ fn get_streams<'a>(
                 .title
                 .split(' ')
                 .map(trim_word_boundaries)
-                .filter_map(|s| (!s.is_empty()).then(|| s.to_lowercase()))
+                .filter(|s| !s.is_empty())
             {
                 for q in query {
-                    if *q == part {
+                    if q.eq_ignore_ascii_case(part) {
                         streams.push((q, stream));
                         break 'stream;
                     }
