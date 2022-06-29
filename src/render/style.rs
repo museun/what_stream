@@ -13,6 +13,7 @@ pub struct Style {
     pub continuation: Cow<'static, str>,
 
     pub stats: Cow<'static, str>,
+    // TODO add 'tags' section
 }
 
 impl Default for Style {

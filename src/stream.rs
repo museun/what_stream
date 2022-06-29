@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use crate::{
     args::{AppAccess, Column, Direction, SortAction},
@@ -8,7 +8,6 @@ use crate::{
 
 #[derive(Debug, serde::Deserialize, serde::Serialize)]
 pub struct Stream {
-    // TODO this should keep the absolute timestamp
     pub started_at: Box<str>,
     pub title: Box<str>,
     pub user_name: Box<str>,
@@ -17,10 +16,11 @@ pub struct Stream {
     pub language: Box<str>,
 
     pub tag_ids: Box<[Box<str>]>,
-    // TODO this should list the translate tag ids
 
-    //
-    #[serde(skip)]
+    #[serde(skip_deserializing)]
+    pub user_tag_map: HashMap<Box<str>, Box<str>>,
+
+    #[serde(skip_deserializing)]
     pub uptime: i64,
 }
 
@@ -48,6 +48,14 @@ pub fn fetch_streams<'a>(
         for (k, v) in get_usernames(&agent, user_ids, &token)? {
             if let Some((_, stream)) = streams.iter_mut().find(|(_, s)| *s.user_id == k) {
                 stream.user_name = v.into();
+            }
+        }
+    }
+
+    for (_, stream) in &mut streams {
+        for id in &*stream.tag_ids {
+            if let Some(tag) = tag_cache.cache.get(id) {
+                stream.user_tag_map.insert(id.clone(), tag.clone());
             }
         }
     }
@@ -83,17 +91,17 @@ pub fn sort_streams(streams: &mut Vec<Stream>, option: Option<SortAction>) {
     });
 }
 
-// TODO the tags don't really change, so we can pre-populate the cache
-// and just update it if we see a tag we don't know
 fn lookup_ids<'a>(
     agent: &ureq::Agent,
     token: &str,
     ids: impl IntoIterator<Item = &'a str> + 'a,
     memo: &mut TagCache,
 ) {
-    #[derive(serde::Deserialize, Debug)]
+    #[derive(serde::Deserialize)]
     struct Tag {
         tag_id: Box<str>,
+        #[serde(default)]
+        is_auto: bool,
         localization_names: HashMap<Box<str>, Box<str>>,
     }
 
@@ -118,7 +126,7 @@ fn lookup_ids<'a>(
         Err(..) => return, // TODO report this
     };
 
-    for data in tags.data {
+    for data in tags.data.into_iter().filter(|s| !s.is_auto) {
         if let Some(name) = { data.localization_names }.remove("en-us") {
             memo.cache.insert(data.tag_id, name);
         }
@@ -178,7 +186,7 @@ fn get_streams<'a>(
             });
         }
 
-        let unknown_ids: Vec<&str> = temp
+        let unknown_ids: HashSet<&str> = temp
             .iter()
             .flat_map(|s| &*s.tag_ids)
             .filter_map(|s| (!tags.cache.contains_key(&**s)).then(|| &**s))

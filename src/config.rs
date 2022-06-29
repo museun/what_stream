@@ -68,6 +68,7 @@ link            = { fg = "#3B78FF", bold = true }
 title           = { fg = "#C19C00", bold = true }
 uptime          = { fg = "#13A10E" }
 viewers         = { fg = "#3A96DD" }
+tags            = { fg = "#404040" }
 "##
     }
 }

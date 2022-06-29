@@ -19,6 +19,11 @@ impl Demo {
                     viewer_count: 7,
                     language: Box::from("en"),
                     tag_ids: Box::from([Box::from("rust")]),
+                    user_tag_map: {
+                        std::iter::once((
+                            "b23d8969-29f8-4f75-ad44-2772e3d28ec4", "Rust"
+                        )).map(|(k,v)| (Box::from(k), Box::from(v))).collect()
+                    },
                     uptime: 0,
                 }],
             },
@@ -33,6 +38,11 @@ impl Demo {
                         viewer_count: 1,
                         language: Box::from("en"),
                         tag_ids: Box::from([Box::from("c++")]),
+                        user_tag_map: {
+                               std::iter::once((
+                            "2b194c54-bc5f-4c4c-85f7-32f03ab0fd7c", "C++"
+                        )).map(|(k,v)| (Box::from(k), Box::from(v))).collect()
+                        },
                         uptime: 0,
                     },
                     Stream {
@@ -43,6 +53,11 @@ impl Demo {
                         viewer_count: 2,
                         language: Box::from("fr"),
                         tag_ids: Box::from([Box::from("")]),
+                        user_tag_map: {
+                               std::iter::once((
+                            "2b194c54-bc5f-4c4c-85f7-32f03ab0fd7c", "C++"
+                        )).map(|(k,v)| (Box::from(k), Box::from(v))).collect()
+                        },
                         uptime: 0,
                     },
                 ],
