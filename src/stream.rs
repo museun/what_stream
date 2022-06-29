@@ -29,7 +29,7 @@ pub fn fetch_streams<'a>(
     let agent = ureq::agent();
     let token = format!("Bearer {}", app_access.access_token);
 
-    let mut streams = iterate_and_filter(&agent, query, languages, &token);
+    let mut streams = get_streams(&agent, query, languages, &token);
 
     // fix up the time
     for (_, stream) in &mut streams {
@@ -80,75 +80,80 @@ pub fn sort_streams(streams: &mut Vec<Stream>, option: Option<SortAction>) {
     });
 }
 
-fn fetch_streams_inner(
+// TODO support tags
+fn get_streams<'a>(
     agent: &ureq::Agent,
-    token: &str,
-    cursor: &mut String,
-) -> Option<Vec<Stream>> {
-    #[derive(serde::Deserialize)]
-    struct Resp<T> {
-        data: Vec<T>,
-        pagination: Pagination,
-    }
-
-    #[derive(Default, serde::Deserialize)]
-    struct Pagination {
-        #[serde(default)]
-        cursor: String,
-    }
-
-    let resp = agent
-        .get("https://api.twitch.tv/helix/streams")
-        .query("game_id", SCIENCE_AND_TECH_CATEGORY)
-        .query("game_id", SOFTWARE_AND_GAME_DEV_CATEGORY)
-        .query("first", "100")
-        .query("after", cursor)
-        .set("client-id", WHAT_STREAM_CLIENT_ID)
-        .set("authorization", token)
-        .call()
-        .ok()?;
-
-    let resp: Resp<Stream> = serde_json::from_reader(resp.into_reader()).ok()?;
-
-    if !resp.data.is_empty() {
-        *cursor = resp.pagination.cursor;
-        return Some(resp.data);
-    }
-    None
-}
-
-fn iterate_and_filter<'a>(
-    agent: &ureq::Agent,
-    query: &'a [String],
-    languages: &[String],
+    query: &'a [String],  // why are these Strings?
+    languages: &[String], // why are these Strings?
     token: &str,
 ) -> Vec<(&'a String, Stream)> {
+    mod data {
+        #[derive(serde::Deserialize)]
+        pub struct Resp<T> {
+            pub data: Vec<T>,
+            pub pagination: Pagination,
+        }
+
+        #[derive(Default, serde::Deserialize)]
+        pub struct Pagination {
+            #[serde(default)]
+            pub cursor: String,
+        }
+    }
+    type Streams = data::Resp<Stream>;
+
+    let mut streams = Vec::new();
     let mut cursor = String::new();
-    std::iter::from_fn(|| fetch_streams_inner(agent, token, &mut cursor))
-        .flatten()
-        .filter(|stream| {
-            languages.is_empty()
-                || languages
+    loop {
+        let resp = match agent
+            .get("https://api.twitch.tv/helix/streams")
+            .query("game_id", SCIENCE_AND_TECH_CATEGORY)
+            .query("game_id", SOFTWARE_AND_GAME_DEV_CATEGORY)
+            .query("first", "100")
+            .query("after", &cursor)
+            .set("client-id", WHAT_STREAM_CLIENT_ID)
+            .set("authorization", token)
+            .call()
+        {
+            Ok(resp) => resp.into_reader(),
+            Err(..) => break, // TODO check for 4xx vs 5xx
+        };
+
+        let mut resp = match serde_json::from_reader::<_, Streams>(resp) {
+            Err(..) => break, // TODO report this
+            Ok(resp) if resp.data.is_empty() => break,
+            Ok(resp) if resp.pagination.cursor == cursor => break,
+            Ok(resp) => resp,
+        };
+
+        cursor = resp.pagination.cursor;
+        let mut temp = std::mem::take(&mut resp.data);
+        if !languages.is_empty() {
+            temp.retain(|stream| {
+                languages
                     .iter()
-                    .any(|s| s.eq_ignore_ascii_case(&stream.language))
-        })
-        .filter_map(|stream| {
-            for part in stream
+                    .any(|lang| stream.language.eq_ignore_ascii_case(&lang))
+            });
+        }
+
+        for stream in temp {
+            'outer: for part in stream
                 .title
                 .split(' ')
                 .map(trim_word_boundaries)
-                .filter(|s| !s.is_empty())
-                .map(|s| s.to_lowercase())
+                .filter_map(|s| (!s.is_empty()).then(|| s.to_lowercase()))
             {
                 for q in query {
                     if *q == part {
-                        return Some((q, stream));
+                        streams.push((q, stream));
+                        break 'outer;
                     }
                 }
             }
-            None
-        })
-        .collect()
+        }
+    }
+
+    streams
 }
 
 fn get_usernames<'b: 'a, 'a, I>(
