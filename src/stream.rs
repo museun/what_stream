@@ -1,4 +1,4 @@
-use std::{borrow::Cow, collections::HashMap};
+use std::collections::HashMap;
 
 use crate::{
     args::{AppAccess, Column, Direction, SortAction},
@@ -8,14 +8,14 @@ use crate::{
 #[derive(Debug, serde::Deserialize, serde::Serialize)]
 pub struct Stream {
     // TODO this should keep the absolute timestamp
-    pub started_at: Cow<'static, str>,
-    pub title: Cow<'static, str>,
-    pub user_name: Cow<'static, str>,
-    pub user_id: Cow<'static, str>,
+    pub started_at: Box<str>,
+    pub title: Box<str>,
+    pub user_name: Box<str>,
+    pub user_id: Box<str>,
     pub viewer_count: i64,
-    pub language: Cow<'static, str>,
+    pub language: Box<str>,
 
-    pub tag_ids: Cow<'static, [Cow<'static, str>]>,
+    pub tag_ids: Box<[Box<str>]>,
 
     #[serde(skip)]
     pub uptime: i64,
@@ -40,13 +40,10 @@ pub fn fetch_streams<'a>(
 
     // then fetch usernames for each userid
     for streams in streams.chunks_mut(100) {
-        let user_ids = streams.iter_mut().map(|(_, u)| match u.user_id {
-            Cow::Borrowed(_) => todo!(),
-            Cow::Owned(ref s) => s,
-        });
+        let user_ids = streams.iter_mut().map(|(_, u)| &*u.user_id);
         for (k, v) in get_usernames(&agent, user_ids, &token)? {
             // this is sorta quadratic
-            if let Some((_, stream)) = streams.iter_mut().find(|(_, s)| s.user_id == k) {
+            if let Some((_, stream)) = streams.iter_mut().find(|(_, s)| &*s.user_id == k) {
                 stream.user_name = v.into();
             }
         }
@@ -58,6 +55,7 @@ pub fn fetch_streams<'a>(
 pub fn sort_streams(streams: &mut Vec<Stream>, option: Option<SortAction>) {
     use {Column::*, Direction::*};
 
+    // TODO figure out a way around this: https://github.com/twitchdev/issues/issues/18
     // sometimes the api hiccups -- this'll ensure we'll just get uniques
     streams.sort_unstable_by(|a, b| a.user_id.cmp(&b.user_id));
     streams.dedup_by(|a, b| a.user_id == b.user_id);
@@ -159,7 +157,7 @@ fn get_usernames<'b: 'a, 'a, I>(
     token: &str,
 ) -> anyhow::Result<HashMap<String, String>>
 where
-    I: Iterator<Item = &'b String> + 'a,
+    I: Iterator<Item = &'b str> + 'a,
 {
     #[derive(serde::Deserialize)]
     struct Resp<T> {
