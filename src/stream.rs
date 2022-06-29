@@ -205,7 +205,7 @@ fn get_streams<'a>(
                 for q in query {
                     if q.eq_ignore_ascii_case(part) {
                         streams.push((q, stream));
-                        break 'stream;
+                        continue 'stream;
                     }
                 }
             }
