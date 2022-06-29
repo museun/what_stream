@@ -99,9 +99,8 @@ fn main() -> anyhow::Result<()> {
     }
 
     try_enable_colors();
-    let out = std::io::stdout();
-    let mut out = out.lock();
 
+    let mut out = std::io::stdout().lock();
     let streams = args
         .query
         .into_iter()

@@ -7,6 +7,7 @@ use crate::{
 
 #[derive(Debug, serde::Deserialize, serde::Serialize)]
 pub struct Stream {
+    // TODO this should keep the absolute timestamp
     pub started_at: Cow<'static, str>,
     pub title: Cow<'static, str>,
     pub user_name: Cow<'static, str>,
