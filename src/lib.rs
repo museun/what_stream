@@ -19,7 +19,7 @@ mod args;
 pub use args::{AppAccess, Args};
 
 mod render;
-pub use render::{Appearance, Config, Demo, Entries, Parameters, Render, Style, Theme};
+pub use render::{Appearance, Config, Demo, Entries, Parameters, Render, Style, TagCache, Theme};
 
 mod stream;
 pub use stream::{fetch_streams, sort_streams, Stream};

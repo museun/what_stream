@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use crate::{
     args::{AppAccess, Column, Direction, SortAction},
+    render::TagCache,
     SCIENCE_AND_TECH_CATEGORY, SOFTWARE_AND_GAME_DEV_CATEGORY, WHAT_STREAM_CLIENT_ID,
 };
 
@@ -25,11 +26,12 @@ pub fn fetch_streams<'a>(
     query: &'a [String],
     languages: &[String],
     app_access: &AppAccess,
+    tag_cache: &mut TagCache,
 ) -> anyhow::Result<Vec<(&'a String, Stream)>> {
     let agent = ureq::agent();
     let token = format!("Bearer {}", app_access.access_token);
 
-    let mut streams = get_streams(&agent, query, languages, &token);
+    let mut streams = get_streams(&agent, query, languages, tag_cache, &token);
 
     // fix up the time
     for (_, stream) in &mut streams {
@@ -42,8 +44,7 @@ pub fn fetch_streams<'a>(
     for streams in streams.chunks_mut(100) {
         let user_ids = streams.iter_mut().map(|(_, u)| &*u.user_id);
         for (k, v) in get_usernames(&agent, user_ids, &token)? {
-            // this is sorta quadratic
-            if let Some((_, stream)) = streams.iter_mut().find(|(_, s)| &*s.user_id == k) {
+            if let Some((_, stream)) = streams.iter_mut().find(|(_, s)| *s.user_id == k) {
                 stream.user_name = v.into();
             }
         }
@@ -80,45 +81,85 @@ pub fn sort_streams(streams: &mut Vec<Stream>, option: Option<SortAction>) {
     });
 }
 
+// TODO the tags don't really change, so we can pre-populate the cache
+// and just update it if we see a tag we don't know
+fn lookup_ids<'a>(
+    agent: &ureq::Agent,
+    token: &str,
+    ids: impl IntoIterator<Item = &'a str> + 'a,
+    memo: &mut TagCache,
+) {
+    #[derive(serde::Deserialize, Debug)]
+    struct Tag {
+        tag_id: Box<str>,
+        localization_names: HashMap<Box<str>, Box<str>>,
+    }
+
+    type Tags = data::Resp<Tag>;
+
+    let resp = match std::iter::repeat("tag_id")
+        .zip(ids)
+        .fold(
+            agent.get("https://api.twitch.tv/helix/tags/streams"),
+            |req, (k, v)| req.query(k, v),
+        )
+        .set("client-id", WHAT_STREAM_CLIENT_ID)
+        .set("authorization", token)
+        .call()
+    {
+        Ok(resp) => resp.into_reader(),
+        Err(..) => return, // TODO report this
+    };
+
+    let tags = match serde_json::from_reader::<_, Tags>(resp) {
+        Ok(tags) => tags,
+        Err(..) => return, // TODO report this
+    };
+
+    for data in tags.data {
+        if let Some(name) = { data.localization_names }.remove("en-us") {
+            memo.cache.insert(data.tag_id, name);
+        }
+    }
+}
+
+mod data {
+    #[derive(serde::Deserialize)]
+    pub struct Resp<T> {
+        pub data: Vec<T>,
+        pub pagination: Pagination,
+    }
+
+    #[derive(Default, serde::Deserialize)]
+    pub struct Pagination {
+        #[serde(default)]
+        pub cursor: String,
+    }
+}
+
 // TODO support tags
 fn get_streams<'a>(
     agent: &ureq::Agent,
-    query: &'a [String],  // why are these Strings?
-    languages: &[String], // why are these Strings?
+    query: &'a [String],
+    languages: &[String],
+    tags: &mut TagCache,
     token: &str,
 ) -> Vec<(&'a String, Stream)> {
-    mod data {
-        #[derive(serde::Deserialize)]
-        pub struct Resp<T> {
-            pub data: Vec<T>,
-            pub pagination: Pagination,
-        }
-
-        #[derive(Default, serde::Deserialize)]
-        pub struct Pagination {
-            #[serde(default)]
-            pub cursor: String,
-        }
-    }
     type Streams = data::Resp<Stream>;
 
     let mut streams = Vec::new();
     let mut cursor = String::new();
-    loop {
-        let resp = match agent
-            .get("https://api.twitch.tv/helix/streams")
-            .query("game_id", SCIENCE_AND_TECH_CATEGORY)
-            .query("game_id", SOFTWARE_AND_GAME_DEV_CATEGORY)
-            .query("first", "100")
-            .query("after", &cursor)
-            .set("client-id", WHAT_STREAM_CLIENT_ID)
-            .set("authorization", token)
-            .call()
-        {
-            Ok(resp) => resp.into_reader(),
-            Err(..) => break, // TODO check for 4xx vs 5xx
-        };
-
+    while let Ok(resp) = agent
+        .get("https://api.twitch.tv/helix/streams")
+        .query("game_id", SCIENCE_AND_TECH_CATEGORY)
+        .query("game_id", SOFTWARE_AND_GAME_DEV_CATEGORY)
+        .query("first", "100")
+        .query("after", &cursor)
+        .set("client-id", WHAT_STREAM_CLIENT_ID)
+        .set("authorization", token)
+        .call()
+        .map(ureq::Response::into_reader)
+    {
         let mut resp = match serde_json::from_reader::<_, Streams>(resp) {
             Err(..) => break, // TODO report this
             Ok(resp) if resp.data.is_empty() => break,
@@ -132,12 +173,31 @@ fn get_streams<'a>(
             temp.retain(|stream| {
                 languages
                     .iter()
-                    .any(|lang| stream.language.eq_ignore_ascii_case(&lang))
+                    .any(|lang| stream.language.eq_ignore_ascii_case(lang))
             });
         }
 
-        for stream in temp {
-            'outer: for part in stream
+        let unknown_ids: Vec<&str> = temp
+            .iter()
+            .flat_map(|s| &*s.tag_ids)
+            .filter_map(|s| (!tags.cache.contains_key(&**s)).then(|| &**s))
+            .collect();
+
+        lookup_ids(agent, token, unknown_ids, tags);
+
+        'stream: for stream in temp {
+            for id in &*stream.tag_ids {
+                if let Some(tag) = tags.cache.get(id) {
+                    for q in query {
+                        if q.eq_ignore_ascii_case(tag) {
+                            streams.push((q, stream));
+                            continue 'stream;
+                        }
+                    }
+                }
+            }
+
+            for part in stream
                 .title
                 .split(' ')
                 .map(trim_word_boundaries)
@@ -146,7 +206,7 @@ fn get_streams<'a>(
                 for q in query {
                     if *q == part {
                         streams.push((q, stream));
-                        break 'outer;
+                        break 'stream;
                     }
                 }
             }

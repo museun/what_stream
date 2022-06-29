@@ -4,7 +4,7 @@ mod color;
 pub use color::{Color, ColorStyle};
 
 mod config;
-pub use config::{Appearance, Config, Parameters};
+pub use config::{Appearance, Config, Parameters, TagCache};
 
 mod theme;
 pub use theme::Theme;

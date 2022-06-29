@@ -1,4 +1,31 @@
-use std::path::PathBuf;
+use std::{collections::HashMap, path::PathBuf};
+
+use anyhow::Context;
+
+#[derive(Default, Debug, serde::Serialize, serde::Deserialize)]
+pub struct TagCache {
+    pub cache: HashMap<Box<str>, Box<str>>,
+}
+
+impl TagCache {
+    pub fn get_cache_path() -> Option<PathBuf> {
+        dirs::cache_dir().map(|f| f.join("museun").join("what_stream").join("tags_cache.json"))
+    }
+
+    pub fn load_cache() -> Self {
+        Self::get_cache_path()
+            .and_then(|p| std::fs::read(p).ok())
+            .and_then(|s| serde_json::from_slice(&*s).ok())
+            .unwrap_or_default()
+    }
+
+    pub fn sync(&self) -> anyhow::Result<()> {
+        let path = Self::get_cache_path().with_context(|| "cannot get the cache path")?;
+        let mut writer = std::io::BufWriter::new(std::fs::File::create(path)?);
+        serde_json::to_writer(&mut writer, self)?;
+        Ok(())
+    }
+}
 
 #[derive(Default, Debug, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "lowercase")]

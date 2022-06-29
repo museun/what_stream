@@ -122,7 +122,7 @@ pub enum Column {
     Name,
 }
 
-#[derive(Debug, Copy, Clone, PartialOrd, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialOrd, PartialEq, Eq)]
 pub enum Direction {
     Descending,
     Ascending,

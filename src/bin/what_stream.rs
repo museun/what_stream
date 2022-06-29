@@ -82,12 +82,18 @@ fn main() -> anyhow::Result<()> {
     // TODO read from the config to see if we should override the token?
     let app_access = AppAccess::get()?;
 
-    let mut streams: HashMap<_, Vec<_>> = fetch_streams(&args.query, &args.languages, &app_access)?
-        .into_iter()
-        .fold(Default::default(), |mut map, (category, stream)| {
-            map.entry(category.clone()).or_default().push(stream);
-            map
-        });
+    let mut tag_cache = TagCache::load_cache();
+    let mut streams: HashMap<_, Vec<_>> =
+        fetch_streams(&args.query, &args.languages, &app_access, &mut tag_cache)?
+            .into_iter()
+            .fold(Default::default(), |mut map, (category, stream)| {
+                map.entry(category.clone()).or_default().push(stream);
+                map
+            });
+
+    if let Err(..) = tag_cache.sync() {
+        // TODO report this
+    }
 
     if args.json {
         println!("{}", serde_json::to_string_pretty(&streams)?);
