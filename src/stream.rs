@@ -17,7 +17,9 @@ pub struct Stream {
     pub language: Box<str>,
 
     pub tag_ids: Box<[Box<str>]>,
+    // TODO this should list the translate tag ids
 
+    //
     #[serde(skip)]
     pub uptime: i64,
 }
