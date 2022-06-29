@@ -98,7 +98,10 @@ impl std::str::FromStr for SortAction {
             "viewers" => Column::Viewers,
             "uptime" => Column::Uptime,
             "name" => Column::Name,
-            name => anyhow::bail!("invalid column: {}", name),
+            name => anyhow::bail!(
+                "invalid column: {}. supported columns: [viewers | uptime | name]",
+                name
+            ),
         };
 
         let direction = iter
@@ -106,7 +109,7 @@ impl std::str::FromStr for SortAction {
             .map(|tail| match tail {
                 "asc" | "ascending" => Ok(Direction::Ascending),
                 "desc" | "descending" | "" => Ok(Direction::Descending),
-                dir => anyhow::bail!("invalid direction: {}", dir),
+                dir => anyhow::bail!("invalid direction: {}. supported directions: [asc | ascending | desc | descending]", dir),
             })
             .transpose()?
             .unwrap_or(Direction::Descending);
