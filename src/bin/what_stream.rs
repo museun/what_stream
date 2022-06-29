@@ -37,11 +37,11 @@ where
         })
 }
 
-fn append_maybe(left: &mut Vec<String>, right: &[String]) {
+fn append_maybe<T: Clone>(left: &mut Vec<T>, right: &[T], retain: fn(&T) -> bool) {
     if left.is_empty() {
         left.extend(right.iter().cloned());
     }
-    left.retain(|s| !s.is_empty());
+    left.retain(retain);
 }
 
 fn show_demo(config: &Config) -> anyhow::Result<()> {
@@ -62,8 +62,12 @@ fn main() -> anyhow::Result<()> {
         .transpose()?
         .unwrap_or_default();
 
-    append_maybe(&mut args.languages, &*config.parameters.languages);
-    append_maybe(&mut args.query, &*config.parameters.query);
+    append_maybe(&mut args.languages, &*config.parameters.languages, |s| {
+        !s.is_empty()
+    });
+    append_maybe(&mut args.query, &*config.parameters.query, |s| {
+        !s.is_empty()
+    });
 
     if args.demo {
         show_demo(&config)?;
