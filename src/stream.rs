@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crate::{
     args::{AppAccess, Column, Direction, SortAction},
-    render::TagCache,
+    config::TagCache,
     SCIENCE_AND_TECH_CATEGORY, SOFTWARE_AND_GAME_DEV_CATEGORY, WHAT_STREAM_CLIENT_ID,
 };
 
