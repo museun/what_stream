@@ -56,12 +56,16 @@ fn show_demo(config: &Config) -> anyhow::Result<()> {
 
 fn main() -> anyhow::Result<()> {
     let mut args = Args::parse()?;
+    // TODO this should probably notify the user that the configuration path doesn't exist
+    // and prompt them to either make it, or maybe we should make it for them
+    // (mkdir -p isn't a nice thing a program should do for the user)
     let config: Config = Config::get_config_path()
         .and_then(|f| std::fs::read(f).ok())
         .map(|d| toml::from_slice(&d).with_context(|| "invalid toml"))
         .transpose()?
         .unwrap_or_default();
 
+    // TODO this is ugly
     append_maybe(&mut args.languages, &*config.parameters.languages, |s| {
         !s.is_empty()
     });
