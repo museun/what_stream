@@ -11,6 +11,8 @@ pub struct Theme {
     pub title: ColorStyle,
     pub uptime: ColorStyle,
     pub viewers: ColorStyle,
+
+    pub tag: ColorStyle,
 }
 
 impl Theme {
@@ -25,6 +27,8 @@ impl Theme {
             title: ColorStyle::new(Color::YELLOW).bold(),
             uptime: ColorStyle::new(Color::GREEN),
             viewers: ColorStyle::new(Color::CYAN),
+
+            tag: ColorStyle::new(Color(64, 64, 64)),
         }
     }
 }

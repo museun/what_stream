@@ -67,17 +67,41 @@ impl<'a> Render for Entries<'a> {
                 writeln!(writer, "{}", theme.title.paint(&stream.title))?;
             }
 
+            let print_tags = !stream.user_tag_map.is_empty();
+            let end = if n < self.streams.len() - 1 {
+                &*style.stats
+            } else {
+                &*style.end
+            };
+
             writeln!(
                 writer,
                 "{left}started {uptime} ago, {viewers} watching",
                 uptime = theme.uptime.paint(&stream.started_at),
                 viewers = theme.viewers.paint(&stream.viewer_count),
-                left = theme.fringe.paint(if n < self.streams.len() - 1 {
-                    &*style.stats
-                } else {
-                    &*style.end
-                })
+                left = theme
+                    .fringe
+                    .paint(if print_tags { &*style.stats } else { end })
             )?;
+
+            if !print_tags {
+                continue;
+            }
+
+            write!(writer, "{left}tags: ", left = theme.fringe.paint(end))?;
+            let len = stream.user_tag_map.len();
+            let mut tags = stream.user_tag_map.values().collect::<Vec<_>>();
+            tags.sort_unstable();
+
+            for (i, tags) in tags.into_iter().enumerate() {
+                write!(
+                    writer,
+                    "{}{}",
+                    theme.tag.paint(tags),
+                    if i < len - 1 { " | " } else { "" }
+                )?;
+            }
+            writeln!(writer)?;
         }
 
         Ok(())
