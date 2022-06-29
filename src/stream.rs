@@ -137,7 +137,6 @@ mod data {
     }
 }
 
-// TODO support tags
 fn get_streams<'a>(
     agent: &ureq::Agent,
     query: &'a [String],
