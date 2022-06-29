@@ -52,7 +52,8 @@ impl Demo {
         style: &crate::Style,
         theme: &crate::Theme,
     ) -> anyhow::Result<()> {
-        std::array::IntoIter::new(Self::ENTRIES)
+        Self::ENTRIES
+            .into_iter()
             .enumerate()
             .try_for_each(|(n, entries)| {
                 if n > 0 {
