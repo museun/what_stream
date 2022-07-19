@@ -55,6 +55,8 @@ fn show_demo(config: &Config) -> anyhow::Result<()> {
 }
 
 fn main() -> anyhow::Result<()> {
+    alto_logger::init_alt_term_logger()?;
+
     let mut args = Args::parse()?;
     // TODO this should probably notify the user that the configuration path doesn't exist
     // and prompt them to either make it, or maybe we should make it for them
@@ -87,6 +89,8 @@ fn main() -> anyhow::Result<()> {
     let app_access = AppAccess::get()?;
 
     let mut tag_cache = TagCache::load_cache();
+
+    log::trace!("starting fetch");
     let mut streams: HashMap<_, Vec<_>> =
         fetch_streams(&args.query, &args.languages, &app_access, &mut tag_cache)?
             .into_iter()
@@ -95,8 +99,8 @@ fn main() -> anyhow::Result<()> {
                 map
             });
 
-    if let Err(..) = tag_cache.sync() {
-        // TODO report this
+    if let Err(err) = tag_cache.sync() {
+        log::error!("cannot sync tags cache: {}", err);
     }
 
     if args.json {

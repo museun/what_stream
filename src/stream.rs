@@ -15,7 +15,8 @@ pub struct Stream {
     pub viewer_count: i64,
     pub language: Box<str>,
 
-    pub tag_ids: Box<[Box<str>]>,
+    #[serde(default)]
+    pub tag_ids: Option<Box<[Box<str>]>>,
 
     #[serde(skip_deserializing)]
     pub user_tag_map: HashMap<Box<str>, Box<str>>,
@@ -53,7 +54,7 @@ pub fn fetch_streams<'a>(
     }
 
     for (_, stream) in &mut streams {
-        for id in &*stream.tag_ids {
+        for id in stream.tag_ids.iter().map(|s| &**s).flatten() {
             if let Some(tag) = tag_cache.cache.get(id) {
                 stream.user_tag_map.insert(id.clone(), tag.clone());
             }
@@ -118,12 +119,18 @@ fn lookup_ids<'a>(
         .call()
     {
         Ok(resp) => resp.into_reader(),
-        Err(..) => return, // TODO report this
+        Err(err) => {
+            log::error!("cannot lookup tags: {}", err);
+            return;
+        }
     };
 
     let tags = match serde_json::from_reader::<_, Tags>(resp) {
         Ok(tags) => tags,
-        Err(..) => return, // TODO report this
+        Err(err) => {
+            log::error!("cannot deserialize tags: {}", err);
+            return;
+        }
     };
 
     for data in tags.data.into_iter().filter(|s| !s.is_auto) {
@@ -156,6 +163,8 @@ fn get_streams<'a>(
 ) -> Vec<(&'a String, Stream)> {
     type Streams = data::Resp<Stream>;
 
+    log::trace!("tag cache: {}", tags.cache.len());
+
     let mut streams = Vec::new();
     let mut cursor = String::new();
     while let Ok(resp) = agent
@@ -167,10 +176,27 @@ fn get_streams<'a>(
         .set("client-id", WHAT_STREAM_CLIENT_ID)
         .set("authorization", token)
         .call()
-        .map(ureq::Response::into_reader)
     {
-        let mut resp = match serde_json::from_reader::<_, Streams>(resp) {
-            Err(..) => break, // TODO report this
+        let json = match resp.into_string() {
+            Ok(json) => json,
+            Err(err) => {
+                log::error!("cannot turn response body into a string: {}", err);
+                break;
+            }
+        };
+
+        let mut resp = match serde_json::from_str::<Streams>(&json) {
+            Err(err) => {
+                log::error!("cannot deserialize response: {}", err);
+                log::trace!(
+                    "body: {}",
+                    serde_json::to_string_pretty(
+                        &serde_json::from_str::<serde_json::Value>(&json).expect("valid json")
+                    )
+                    .unwrap()
+                );
+                break;
+            }
             Ok(resp) if resp.data.is_empty() => break,
             Ok(resp) if resp.pagination.cursor == cursor => break,
             Ok(resp) => resp,
@@ -179,23 +205,32 @@ fn get_streams<'a>(
         cursor = resp.pagination.cursor;
         let mut temp = std::mem::take(&mut resp.data);
         if !languages.is_empty() {
+            log::debug!("got {} new streams", temp.len());
             temp.retain(|stream| {
                 languages
                     .iter()
                     .any(|lang| stream.language.eq_ignore_ascii_case(lang))
             });
+            log::debug!(
+                "filtered to {} streams based on language {:?}",
+                temp.len(),
+                languages
+            );
         }
 
         let unknown_ids: HashSet<&str> = temp
             .iter()
-            .flat_map(|s| &*s.tag_ids)
+            .flat_map(|s| s.tag_ids.iter().map(|s| &**s).flatten())
             .filter_map(|s| (!tags.cache.contains_key(&**s)).then(|| &**s))
             .collect();
 
+        log::debug!("new unknown ids: {}", unknown_ids.len());
+
         lookup_ids(agent, token, unknown_ids, tags);
 
+        let old = streams.len();
         'stream: for stream in temp {
-            for id in &*stream.tag_ids {
+            for id in stream.tag_ids.iter().map(|s| &**s).flatten() {
                 if let Some(tag) = tags.cache.get(id) {
                     for q in query {
                         if q.eq_ignore_ascii_case(tag) {
@@ -220,8 +255,15 @@ fn get_streams<'a>(
                 }
             }
         }
+
+        let new = streams.len().saturating_sub(old);
+        if new == 0 {
+            break;
+        }
+        log::debug!("new streams: {}", new);
     }
 
+    log::debug!("total streams: {}", streams.len());
     streams
 }
 
