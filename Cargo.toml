@@ -2,4 +2,5 @@
 members = [
     "what_stream_core",
     "what_stream_tui",
+    "what_stream_gui",
 ]

@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::io::Write;
 
 use what_stream_core::*;
-use what_stream_tui::*;
+use what_stream_tui::{Config, *};
 
 use anyhow::Context as _;
 
@@ -19,7 +19,7 @@ fn try_enable_colors() {
 
 fn render_streams<'a, I>(out: &mut dyn Write, config: &Config, streams: I) -> anyhow::Result<()>
 where
-    I: IntoIterator<Item = (String, &'a [Stream])>,
+    I: Iterator<Item = (&'a String, &'a [Stream])>,
 {
     let Appearance { glyphs, colors } = &config.appearance;
 
@@ -30,11 +30,7 @@ where
             if n > 0 {
                 writeln!(out)?;
             }
-            Entries {
-                query: &query,
-                streams,
-            }
-            .render(out, glyphs, colors)
+            Entries { query, streams }.render(out, glyphs, colors)
         })
 }
 
@@ -118,7 +114,6 @@ you should edit it -- the only required values are in the 'auth' section
         .join("tags_cache.json");
 
     let mut what_stream = WhatStream::new(
-        &args.query,
         &args.languages,
         &[SCIENCE_AND_TECH_CATEGORY, SOFTWARE_AND_GAME_DEV_CATEGORY],
         app_access,
@@ -126,7 +121,8 @@ you should edit it -- the only required values are in the 'auth' section
     );
 
     log::trace!("starting fetch");
-    let mut streams: HashMap<_, Vec<_>> = what_stream.fetch_streams()?.into_iter().fold(
+    let query = args.query.iter().map(|s| &**s).collect::<Vec<_>>();
+    let mut streams: HashMap<_, Vec<_>> = what_stream.fetch_streams(&query)?.into_iter().fold(
         Default::default(),
         |mut map, (category, stream)| {
             map.entry(category).or_default().push(stream);
@@ -147,8 +143,8 @@ you should edit it -- the only required values are in the 'auth' section
 
     let streams = args
         .query
-        .into_iter()
-        .filter_map(|q| streams.get(&*q).map(|s| (q, s.as_slice())));
+        .iter()
+        .filter_map(|q| streams.get(&**q).map(|s| (q, s.as_slice())));
 
     render_streams(&mut std::io::stdout().lock(), &config, streams)
 }

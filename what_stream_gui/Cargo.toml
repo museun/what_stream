@@ -1,0 +1,15 @@
+[package]
+name                 = "what_stream_gui"
+version              = "0.6.0"
+authors              = ["museun <museun@outlook.com>"]
+edition              = "2021"
+license              = "0BSD"
+
+[dependencies]
+anyhow = "1.0.58"
+eframe = { version = "0.18.0", features = ["dark-light"] }
+indexmap = "1.9.1"
+serde = { version = "1.0.140", features = ["derive"] }
+toml = "0.5.9"
+
+what_stream_core = { path = "../what_stream_core" }

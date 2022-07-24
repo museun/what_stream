@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-#[derive(Debug, serde::Deserialize, serde::Serialize)]
+#[derive(Debug, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
 pub struct Stream {
     pub started_at: Box<str>,
     pub title: Box<str>,
@@ -17,4 +17,16 @@ pub struct Stream {
 
     #[serde(skip_deserializing)]
     pub uptime: i64,
+}
+
+impl Ord for Stream {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.user_id.cmp(&other.user_id)
+    }
+}
+
+impl PartialOrd for Stream {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        self.user_id.partial_cmp(&other.user_id)
+    }
 }

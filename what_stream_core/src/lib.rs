@@ -10,6 +10,8 @@ pub const SCIENCE_AND_TECH_CATEGORY: &str = "509670";
 pub const SOFTWARE_AND_GAME_DEV_CATEGORY: &str = "1469308723";
 
 mod what_stream;
+use std::path::PathBuf;
+
 pub use what_stream::WhatStream;
 
 mod stream;
@@ -25,6 +27,24 @@ mod sort;
 pub use sort::{Column, Direction, SortAction};
 
 mod data;
-mod util;
+pub mod util;
 
 mod http;
+
+pub trait Config {
+    const NAMESPACE: &'static str;
+    const APPLICATION: &'static str;
+
+    fn config_file_name() -> &'static str;
+
+    fn get_config_path() -> Option<PathBuf> {
+        Self::get_config_dir().map(|s| s.join(Self::config_file_name()))
+    }
+
+    fn get_config_dir() -> Option<PathBuf> {
+        dirs::config_dir().map(|f| f.join(Self::NAMESPACE).join(Self::APPLICATION))
+    }
+    fn get_cache_dir() -> Option<PathBuf> {
+        dirs::cache_dir().map(|f| f.join(Self::NAMESPACE).join(Self::APPLICATION))
+    }
+}

@@ -6,7 +6,6 @@ use std::{
 use crate::{http::StatefulAgent, AppAccess, Column, Direction, SortAction, Stream, TagCache};
 
 pub struct WhatStream {
-    query: Vec<String>,
     languages: Vec<String>,
     tag_cache: TagCache,
     categories: Vec<String>,
@@ -14,20 +13,17 @@ pub struct WhatStream {
 }
 
 impl WhatStream {
-    pub fn new<Q, L, C>(
-        query: &[Q],
+    pub fn new<L, C>(
         languages: &[L],
         categories: &[C],
         app_access: AppAccess,
         tag_cache_path: &Path,
     ) -> Self
     where
-        Q: ToString,
         L: ToString,
         C: ToString,
     {
         Self {
-            query: query.iter().map(ToString::to_string).collect(),
             languages: languages.iter().map(ToString::to_string).collect(),
             categories: categories.iter().map(ToString::to_string).collect(),
             agent: StatefulAgent::new(app_access),
@@ -36,8 +32,11 @@ impl WhatStream {
     }
 
     // TODO this should return an iterator so the UI won't block
-    pub fn fetch_streams(&mut self) -> anyhow::Result<Vec<(String, Stream)>> {
-        let mut streams = self.get_streams();
+    pub fn fetch_streams<'a>(
+        &mut self,
+        query: &'a [&str],
+    ) -> anyhow::Result<Vec<(&'a str, Stream)>> {
+        let mut streams = self.get_streams(query);
 
         // fix up the time
         for (_, stream) in &mut streams {
@@ -125,7 +124,7 @@ impl WhatStream {
         }
     }
 
-    fn get_streams(&mut self) -> Vec<(String, Stream)> {
+    fn get_streams<'a>(&mut self, query: &'a [&str]) -> Vec<(&'a str, Stream)> {
         type Streams = crate::data::Resp<Stream>;
 
         log::trace!("tag cache: {}", self.tag_cache.cache.len());
@@ -174,9 +173,9 @@ impl WhatStream {
             'stream: for stream in temp {
                 for id in stream.tag_ids.iter().flat_map(|s| &**s) {
                     if let Some(tag) = self.tag_cache.cache.get(id) {
-                        for q in &self.query {
+                        for q in query {
                             if q.eq_ignore_ascii_case(tag) {
-                                streams.push((q.clone(), stream));
+                                streams.push((*q, stream));
                                 continue 'stream;
                             }
                         }
@@ -189,9 +188,9 @@ impl WhatStream {
                     .map(crate::util::trim_word_boundaries)
                     .filter(|s| !s.is_empty())
                 {
-                    for q in &self.query {
+                    for q in query {
                         if q.eq_ignore_ascii_case(part) {
-                            streams.push((q.clone(), stream));
+                            streams.push((*q, stream));
                             continue 'stream;
                         }
                     }
