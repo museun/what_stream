@@ -10,3 +10,4 @@ FLAGS:
     --demo                     renders a dummy response
     --print-default-config     print the default toml configuration
     --print-config-path        print the default configuration path
+    --print-cache-dir          print the default cache path

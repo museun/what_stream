@@ -1,7 +1,8 @@
 use std::collections::HashMap;
 use std::io::Write;
 
-use what_stream::*;
+use what_stream_core::*;
+use what_stream_tui::*;
 
 use anyhow::Context as _;
 
@@ -46,34 +47,59 @@ fn append_maybe<T: Clone>(left: &mut Vec<T>, right: &[T], retain: fn(&T) -> bool
 
 fn show_demo(config: &Config) -> anyhow::Result<()> {
     try_enable_colors();
-    let out = std::io::stdout();
-    let mut out = out.lock();
-
     let Appearance { glyphs, colors } = &config.appearance;
-    what_stream::Demo::show_off(&mut out, glyphs, colors)?;
-    Ok(())
+    what_stream_tui::Demo::show_off(&mut std::io::stdout().lock(), glyphs, colors)
 }
 
 fn main() -> anyhow::Result<()> {
     alto_logger::init_alt_term_logger()?;
 
-    let mut args = Args::parse()?;
-    // TODO this should probably notify the user that the configuration path doesn't exist
-    // and prompt them to either make it, or maybe we should make it for them
-    // (mkdir -p isn't a nice thing a program should do for the user)
-    let config: Config = Config::get_config_path()
-        .and_then(|f| std::fs::read(f).ok())
+    let mut args = match Args::parse() {
+        Ok(args) => args,
+        Err(err) => {
+            eprintln!(
+                "{err}\ntry running: {program_name} --help",
+                err = err,
+                program_name = env!("CARGO_CRATE_NAME")
+            );
+            std::process::exit(1)
+        }
+    };
+
+    let config_path = Config::get_config_path().with_context(|| "cannot get configuration path")?;
+    let config: Config = match std::fs::read(&config_path)
+        .ok()
         .map(|d| toml::from_slice(&d).with_context(|| "invalid toml"))
         .transpose()?
-        .unwrap_or_default();
+    {
+        Some(config) => config,
+        None => {
+            let cache_dir = Config::get_cache_dir().with_context(|| "cannot get cache path")?;
+            eprintln!(
+                r#"
+a configuration file was not found at:
+{config_file}
+
+this will create the directory if it does not exist
+this will also create a cache directory at: {cache_dir}
+and then create the configuration file
+
+you should edit it -- the only required values are in the 'auth' section
+"#,
+                config_file = config_path.display(),
+                cache_dir = cache_dir.display()
+            );
+
+            Config::make_required_dirs()?;
+            return Config::make_default_config();
+        }
+    };
 
     // TODO this is ugly
-    append_maybe(&mut args.languages, &*config.parameters.languages, |s| {
+    append_maybe(&mut args.languages, &config.parameters.languages, |s| {
         !s.is_empty()
     });
-    append_maybe(&mut args.query, &*config.parameters.query, |s| {
-        !s.is_empty()
-    });
+    append_maybe(&mut args.query, &config.parameters.query, |s| !s.is_empty());
 
     if args.demo {
         show_demo(&config)?;
@@ -85,10 +111,13 @@ fn main() -> anyhow::Result<()> {
         std::process::exit(1)
     }
 
-    // TODO read from the config to see if we should override the token?
-    let app_access = AppAccess::get()?;
+    let app_access = AppAccess::get(&config.auth.client_id, &config.auth.client_secret)?;
 
-    let mut tag_cache = TagCache::load_cache();
+    let mut tag_cache = TagCache::load_cache(
+        &Config::get_cache_dir()
+            .with_context(|| "cannot get the cache directory")?
+            .join("tags_cache.json"),
+    );
 
     log::trace!("starting fetch");
     let mut streams: HashMap<_, Vec<_>> =
@@ -114,11 +143,10 @@ fn main() -> anyhow::Result<()> {
 
     try_enable_colors();
 
-    let mut out = std::io::stdout().lock();
     let streams = args
         .query
         .into_iter()
         .filter_map(|q| streams.get(&*q).map(|s| (q, s.as_slice())));
 
-    render_streams(&mut out, &config, streams)
+    render_streams(&mut std::io::stdout().lock(), &config, streams)
 }

@@ -1,6 +1,6 @@
 use std::io::Write;
 
-use crate::stream::Stream;
+use what_stream_core::Stream;
 
 use super::{Render, Style, Theme};
 

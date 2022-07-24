@@ -1,11 +1,5 @@
 // Note: You must register an application at https://dev.twitch.tv/console
 
-// The client id for your application
-pub const WHAT_STREAM_CLIENT_ID: &str = env!("WHAT_STREAM_CLIENT_ID");
-
-// The client secret for your application
-pub const WHAT_STREAM_CLIENT_SECRET: &str = env!("WHAT_STREAM_CLIENT_SECRET");
-
 // TODO allow for custom categories
 // TODO provide a utlity for looking up category ideas for a query
 
@@ -15,16 +9,14 @@ pub const SCIENCE_AND_TECH_CATEGORY: &str = "509670";
 // This is hardcoded to look at specific category, namely 'Software and Game development'
 pub const SOFTWARE_AND_GAME_DEV_CATEGORY: &str = "1469308723";
 
-mod args;
-pub use args::{AppAccess, Args};
-
-mod render;
-pub use render::{Demo, Entries, Render, Style, Theme};
-
-mod config;
-pub use config::{Appearance, Config, Parameters, TagCache};
-
 mod stream;
 pub use stream::{fetch_streams, sort_streams, Stream};
 
-mod string;
+mod tags_cache;
+pub use tags_cache::TagCache;
+
+mod app_access;
+pub use app_access::AppAccess;
+
+mod sort;
+pub use sort::{Column, Direction, SortAction};

@@ -1,9 +1,8 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::{
-    args::{AppAccess, Column, Direction, SortAction},
-    config::TagCache,
-    SCIENCE_AND_TECH_CATEGORY, SOFTWARE_AND_GAME_DEV_CATEGORY, WHAT_STREAM_CLIENT_ID,
+    AppAccess, Column, Direction, SortAction, TagCache, SCIENCE_AND_TECH_CATEGORY,
+    SOFTWARE_AND_GAME_DEV_CATEGORY,
 };
 
 #[derive(Debug, serde::Deserialize, serde::Serialize)]
@@ -32,9 +31,8 @@ pub fn fetch_streams<'a>(
     tag_cache: &mut TagCache,
 ) -> anyhow::Result<Vec<(&'a String, Stream)>> {
     let agent = ureq::agent();
-    let token = format!("Bearer {}", app_access.access_token);
 
-    let mut streams = get_streams(&agent, query, languages, tag_cache, &token);
+    let mut streams = get_streams(&agent, query, languages, tag_cache, app_access);
 
     // fix up the time
     for (_, stream) in &mut streams {
@@ -46,7 +44,7 @@ pub fn fetch_streams<'a>(
     // then fetch usernames for each userid
     for streams in streams.chunks_mut(100) {
         let user_ids = streams.iter_mut().map(|(_, u)| &*u.user_id);
-        for (k, v) in get_usernames(&agent, user_ids, &token)? {
+        for (k, v) in get_usernames(&agent, user_ids, app_access)? {
             if let Some((_, stream)) = streams.iter_mut().find(|(_, s)| *s.user_id == k) {
                 stream.user_name = v.into();
             }
@@ -54,7 +52,7 @@ pub fn fetch_streams<'a>(
     }
 
     for (_, stream) in &mut streams {
-        for id in stream.tag_ids.iter().map(|s| &**s).flatten() {
+        for id in stream.tag_ids.iter().flat_map(|s| &**s) {
             if let Some(tag) = tag_cache.cache.get(id) {
                 stream.user_tag_map.insert(id.clone(), tag.clone());
             }
@@ -94,9 +92,9 @@ pub fn sort_streams(streams: &mut Vec<Stream>, option: Option<SortAction>) {
 
 fn lookup_ids<'a>(
     agent: &ureq::Agent,
-    token: &str,
     ids: impl IntoIterator<Item = &'a str> + 'a,
     memo: &mut TagCache,
+    app_access: &AppAccess,
 ) {
     #[derive(serde::Deserialize)]
     struct Tag {
@@ -114,8 +112,8 @@ fn lookup_ids<'a>(
             agent.get("https://api.twitch.tv/helix/tags/streams"),
             |req, (k, v)| req.query(k, v),
         )
-        .set("client-id", WHAT_STREAM_CLIENT_ID)
-        .set("authorization", token)
+        .set("client-id", app_access.get_client_id())
+        .set("authorization", app_access.get_bearer_token())
         .call()
     {
         Ok(resp) => resp.into_reader(),
@@ -159,7 +157,7 @@ fn get_streams<'a>(
     query: &'a [String],
     languages: &[String],
     tags: &mut TagCache,
-    token: &str,
+    app_access: &AppAccess,
 ) -> Vec<(&'a String, Stream)> {
     type Streams = data::Resp<Stream>;
 
@@ -173,8 +171,8 @@ fn get_streams<'a>(
         .query("game_id", SOFTWARE_AND_GAME_DEV_CATEGORY)
         .query("first", "100")
         .query("after", &cursor)
-        .set("client-id", WHAT_STREAM_CLIENT_ID)
-        .set("authorization", token)
+        .set("client-id", app_access.get_client_id())
+        .set("authorization", app_access.get_bearer_token())
         .call()
     {
         let json = match resp.into_string() {
@@ -220,17 +218,17 @@ fn get_streams<'a>(
 
         let unknown_ids: HashSet<&str> = temp
             .iter()
-            .flat_map(|s| s.tag_ids.iter().map(|s| &**s).flatten())
-            .filter_map(|s| (!tags.cache.contains_key(&**s)).then(|| &**s))
+            .flat_map(|s| s.tag_ids.iter().flat_map(|s| &**s))
+            .filter_map(|s| (!tags.cache.contains_key(&**s)).then_some(&**s))
             .collect();
 
         log::debug!("new unknown ids: {}", unknown_ids.len());
 
-        lookup_ids(agent, token, unknown_ids, tags);
+        lookup_ids(agent, unknown_ids, tags, app_access);
 
         let old = streams.len();
         'stream: for stream in temp {
-            for id in stream.tag_ids.iter().map(|s| &**s).flatten() {
+            for id in stream.tag_ids.iter().flat_map(|s| &**s) {
                 if let Some(tag) = tags.cache.get(id) {
                     for q in query {
                         if q.eq_ignore_ascii_case(tag) {
@@ -270,7 +268,7 @@ fn get_streams<'a>(
 fn get_usernames<'b: 'a, 'a, I>(
     agent: &ureq::Agent,
     ids: I,
-    token: &str,
+    app_access: &AppAccess,
 ) -> anyhow::Result<HashMap<String, String>>
 where
     I: Iterator<Item = &'b str> + 'a,
@@ -292,8 +290,8 @@ where
             agent.get("https://api.twitch.tv/helix/users"),
             |req, (k, v)| req.query(k, v),
         )
-        .set("client-id", WHAT_STREAM_CLIENT_ID)
-        .set("authorization", token)
+        .set("client-id", app_access.get_client_id())
+        .set("authorization", app_access.get_bearer_token())
         .call()?
         .into_json::<Resp<User>>()?
         .data

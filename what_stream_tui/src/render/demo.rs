@@ -1,4 +1,5 @@
-use crate::{Entries, Render, Stream};
+use crate::{Entries, Render};
+use what_stream_core::Stream;
 
 pub struct Demo;
 
