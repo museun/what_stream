@@ -91,7 +91,7 @@ impl<'de> serde::Deserialize<'de> for Color {
     }
 }
 
-#[derive(Copy, Clone, Debug, serde::Deserialize, serde::Serialize)]
+#[derive(Copy, Clone, Debug, Default, serde::Deserialize, serde::Serialize)]
 #[serde(default)]
 pub struct ColorStyle {
     pub fg: Color,
@@ -127,15 +127,5 @@ impl ColorStyle {
             p = p.bold();
         }
         p
-    }
-}
-
-impl Default for ColorStyle {
-    fn default() -> Self {
-        Self {
-            fg: Color::default_fg(),
-            bg: None,
-            bold: false,
-        }
     }
 }

@@ -5,11 +5,8 @@ SORTING:
      - uptime
 
     available directions:
-     - descending (the default)
-     - desc (shorthand)
-
-     - ascending
-     - asc (shorthand)
+     - descending (the default) | desc (shorthand)
+     - ascending | asc (shorthand)
 
 QUERY:
     query is a space separated list of 'tags' to filter by.

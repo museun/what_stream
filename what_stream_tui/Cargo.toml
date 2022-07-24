@@ -1,0 +1,22 @@
+[package]
+name                 = "what_stream_tui"
+version              = "0.6.0"
+authors              = ["museun <museun@outlook.com>"]
+edition              = "2021"
+license              = "0BSD"
+
+[dependencies]
+alto_logger          = "0.3.7"
+anyhow               = "1.0.58"
+dirs                 = "4.0.0"
+log                  = "0.4.17"
+pico-args            = "0.5.0"
+serde                = { version = "1.0.137", features = ["derive"] }
+serde_json           = "1.0.81"
+terminal_size        = "0.1.17"
+toml                 = "0.5.9"
+unicode-segmentation = "1.9.0"
+unicode-width        = "0.1.9"
+yansi                = "0.5.1"
+
+what_stream_core     = { path = "../what_stream_core" }

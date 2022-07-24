@@ -1,6 +1,6 @@
 use std::io::Write;
 
-use crate::stream::Stream;
+use what_stream_core::Stream;
 
 use super::{Render, Style, Theme};
 
@@ -88,6 +88,7 @@ impl<'a> Render for Entries<'a> {
                 continue;
             }
 
+            // TODO wrap the tags
             write!(writer, "{left}tags: ", left = theme.fringe.paint(end))?;
             let len = stream.user_tag_map.len();
             let mut tags = stream.user_tag_map.values().collect::<Vec<_>>();
