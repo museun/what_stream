@@ -111,26 +111,28 @@ you should edit it -- the only required values are in the 'auth' section
         std::process::exit(1)
     }
 
-    let app_access = AppAccess::get(&config.auth.client_id, &config.auth.client_secret)?;
+    let app_access = AppAccess::create(&config.auth.client_id, &config.auth.client_secret)?;
 
-    let mut tag_cache = TagCache::load_cache(
-        &Config::get_cache_dir()
-            .with_context(|| "cannot get the cache directory")?
-            .join("tags_cache.json"),
+    let tag_cache_path = Config::get_cache_dir()
+        .with_context(|| "cannot get the cache directory")?
+        .join("tags_cache.json");
+
+    let mut what_stream = WhatStream::new(
+        &args.query,
+        &args.languages,
+        &[SCIENCE_AND_TECH_CATEGORY, SOFTWARE_AND_GAME_DEV_CATEGORY],
+        app_access,
+        &tag_cache_path,
     );
 
     log::trace!("starting fetch");
-    let mut streams: HashMap<_, Vec<_>> =
-        fetch_streams(&args.query, &args.languages, &app_access, &mut tag_cache)?
-            .into_iter()
-            .fold(Default::default(), |mut map, (category, stream)| {
-                map.entry(category.clone()).or_default().push(stream);
-                map
-            });
-
-    if let Err(err) = tag_cache.sync() {
-        log::error!("cannot sync tags cache: {}", err);
-    }
+    let mut streams: HashMap<_, Vec<_>> = what_stream.fetch_streams()?.into_iter().fold(
+        Default::default(),
+        |mut map, (category, stream)| {
+            map.entry(category).or_default().push(stream);
+            map
+        },
+    );
 
     if args.json {
         println!("{}", serde_json::to_string_pretty(&streams)?);
@@ -138,7 +140,7 @@ you should edit it -- the only required values are in the 'auth' section
     }
 
     for streams in streams.values_mut() {
-        sort_streams(streams, args.sort)
+        WhatStream::sort_streams(streams, args.sort)
     }
 
     try_enable_colors();

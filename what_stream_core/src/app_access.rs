@@ -34,7 +34,7 @@ impl std::fmt::Debug for AppAccess {
 }
 
 impl AppAccess {
-    pub fn get(client_id: &str, client_secret: &str) -> anyhow::Result<Self> {
+    pub fn create(client_id: &str, client_secret: &str) -> anyhow::Result<Self> {
         assert!(!client_id.is_empty(), "client_id cannot be empty");
         assert!(!client_secret.is_empty(), "client_secret cannot be empty");
 
